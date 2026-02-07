@@ -87,6 +87,18 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _navigateToPhotoList() async {
+    final selectedSpot = await Navigator.push<PhotoSpot>(
+      context,
+      MaterialPageRoute(builder: (context) => const PhotoListScreen()),
+    );
+
+    if (selectedSpot != null) {
+      mapController.animateCamera(CameraUpdate.newLatLng(selectedSpot.position));
+      _showImageDialog(selectedSpot.imagePath);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,14 +108,7 @@ class _MapScreenState extends State<MapScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.photo_library),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PhotoListScreen(),
-                ),
-              );
-            },
+            onPressed: _navigateToPhotoList,
           ),
         ],
       ),

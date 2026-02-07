@@ -62,6 +62,9 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
                   ),
                   title: Text('Spot ${spot.id}'),
                   subtitle: Text('Lat: ${spot.latitude}, Lng: ${spot.longitude}'),
+                  onTap: () {
+                    Navigator.of(context).pop(spot);
+                  },
                 ),
               );
             },
