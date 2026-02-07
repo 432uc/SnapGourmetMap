@@ -21,14 +21,29 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
 
   Future<List<PhotoSpot>> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
-    return dataList
-        .map((item) => PhotoSpot(
-              id: item['id'],
-              latitude: item['latitude'],
-              longitude: item['longitude'],
-              imagePath: item['imagePath'],
-            ))
-        .toList();
+    return dataList.map((item) => PhotoSpot.fromMap(item)).toList();
+  }
+
+  // Helper to get category names
+  Future<String> _getCategoryInfo(PhotoSpot spot) async {
+    if (spot.categoryId == null) return 'No Category';
+
+    String categoryName = '';
+    String subCategoryName = '';
+
+    final categoryData = await DBHelper.getDataWhere('categories', 'id = ?', [spot.categoryId!]);
+    if (categoryData.isNotEmpty) {
+      categoryName = categoryData.first['name'] as String;
+    }
+
+    if (spot.subCategoryId != null) {
+      final subCategoryData = await DBHelper.getDataWhere('sub_categories', 'id = ?', [spot.subCategoryId!]);
+      if (subCategoryData.isNotEmpty) {
+        subCategoryName = subCategoryData.first['name'] as String;
+      }
+    }
+
+    return subCategoryName.isEmpty ? categoryName : '$categoryName / $subCategoryName';
   }
 
   @override
@@ -60,8 +75,16 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
                     width: 100,
                     fit: BoxFit.cover,
                   ),
-                  title: Text('Spot ${spot.id}'),
-                  subtitle: Text('Lat: ${spot.latitude}, Lng: ${spot.longitude}'),
+                  title: Text('Spot #${spot.id}'),
+                  subtitle: FutureBuilder<String>(
+                    future: _getCategoryInfo(spot),
+                    builder: (context, catSnapshot) {
+                      if (catSnapshot.connectionState == ConnectionState.waiting) {
+                        return const Text('Loading...');
+                      }
+                      return Text(catSnapshot.data ?? 'Lat: ${spot.latitude}');
+                    },
+                  ),
                   onTap: () {
                     Navigator.of(context).pop(spot);
                   },

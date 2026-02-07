@@ -5,12 +5,16 @@ class PhotoSpot {
   final double latitude;
   final double longitude;
   final String imagePath;
+  final int? categoryId;
+  final int? subCategoryId;
 
   PhotoSpot({
     this.id,
     required this.latitude,
     required this.longitude,
     required this.imagePath,
+    this.categoryId,
+    this.subCategoryId,
   });
 
   LatLng get position => LatLng(latitude, longitude);
@@ -21,6 +25,19 @@ class PhotoSpot {
       'latitude': latitude,
       'longitude': longitude,
       'imagePath': imagePath,
+      'categoryId': categoryId,
+      'subCategoryId': subCategoryId,
     };
+  }
+
+  factory PhotoSpot.fromMap(Map<String, dynamic> map) {
+    return PhotoSpot(
+      id: map['id'],
+      latitude: map['latitude'],
+      longitude: map['longitude'],
+      imagePath: map['imagePath'],
+      categoryId: map['categoryId'],
+      subCategoryId: map['subCategoryId'],
+    );
   }
 }

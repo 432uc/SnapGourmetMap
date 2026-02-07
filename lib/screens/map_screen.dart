@@ -5,6 +5,7 @@ import '../helpers/db_helper.dart';
 import '../models/photo_spot.dart';
 import 'camera_screen.dart';
 import 'photo_list_screen.dart';
+import 'settings_screen.dart'; // Import settings screen
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -25,16 +26,11 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
-    final spots = dataList
-        .map(
-          (item) => PhotoSpot(
-            id: item['id'],
-            latitude: item['latitude'],
-            longitude: item['longitude'],
-            imagePath: item['imagePath'],
-          ),
-        )
-        .toList();
+    // Clear existing markers before loading new ones
+    setState(() {
+      _markers.clear();
+    });
+    final spots = dataList.map((item) => PhotoSpot.fromMap(item)).toList();
 
     for (final spot in spots) {
       _addMarker(spot);
@@ -45,11 +41,12 @@ class _MapScreenState extends State<MapScreen> {
     mapController = controller;
   }
 
-  void _showImageDialog(String imagePath) {
+  void _showImageDialog(PhotoSpot spot) {
+    // This can be enhanced to show category info
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        content: Image.file(File(imagePath)),
+        content: Image.file(File(spot.imagePath)),
         actions: <Widget>[
           TextButton(
             child: const Text('Close'),
@@ -63,16 +60,16 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _addMarker(PhotoSpot spot) {
-      final marker = Marker(
-        markerId: MarkerId(spot.id.toString()),
-        position: spot.position,
-        onTap: () {
-          _showImageDialog(spot.imagePath);
-        },
-      );
-      setState(() {
-          _markers.add(marker);
-      });
+    final marker = Marker(
+      markerId: MarkerId(spot.id.toString()),
+      position: spot.position,
+      onTap: () {
+        _showImageDialog(spot);
+      },
+    );
+    setState(() {
+      _markers.add(marker);
+    });
   }
 
   void _navigateAndAddNewSpot() async {
@@ -82,6 +79,7 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     if (newSpot != null) {
+      // In the next phase, we will navigate to an Edit screen first.
       _addMarker(newSpot);
       mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
     }
@@ -95,7 +93,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (selectedSpot != null) {
       mapController.animateCamera(CameraUpdate.newLatLng(selectedSpot.position));
-      _showImageDialog(selectedSpot.imagePath);
+      _showImageDialog(selectedSpot);
     }
   }
 
@@ -110,12 +108,21 @@ class _MapScreenState extends State<MapScreen> {
             icon: const Icon(Icons.photo_library),
             onPressed: _navigateToPhotoList,
           ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              ).then((_) => _loadPhotoSpots()); // Refresh spots when returning
+            },
+          ),
         ],
       ),
       body: GoogleMap(
         onMapCreated: _onMapCreated,
         initialCameraPosition: const CameraPosition(
-          target: LatLng(35.944, 140.051), // Initial camera position
+          target: LatLng(35.944, 140.051),
           zoom: 15.0,
         ),
         markers: _markers,

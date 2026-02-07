@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../helpers/db_helper.dart';
 import '../models/photo_spot.dart';
+import 'edit_spot_screen.dart'; // Import the new edit screen
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -51,19 +51,29 @@ class _CameraScreenState extends State<CameraScreen> {
       final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
-      final newSpot = PhotoSpot(
+      // Create a temporary PhotoSpot without saving it to the DB yet.
+      final tempSpot = PhotoSpot(
         latitude: position.latitude,
         longitude: position.longitude,
         imagePath: image.path,
       );
 
-      await DBHelper.insert('photo_spots', newSpot.toMap());
-
       if (!mounted) return;
 
-      Navigator.of(context).pop(newSpot);
+      // Navigate to the edit screen and wait for a result.
+      final finalSpot = await Navigator.of(context).push<PhotoSpot>(
+        MaterialPageRoute(
+          builder: (context) => EditSpotScreen(photoSpot: tempSpot),
+        ),
+      );
+
+      // Pop the CameraScreen and return the final spot to the MapScreen.
+      if (finalSpot != null) {
+        Navigator.of(context).pop(finalSpot);
+      }
+
     } catch (e) {
-      if(mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${e.toString()}')),
         );
