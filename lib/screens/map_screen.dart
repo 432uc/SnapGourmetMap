@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../helpers/db_helper.dart';
+import '../models/photo_spot.dart';
 import 'camera_screen.dart';
+import 'photo_list_screen.dart';
 
 class MapScreen extends StatefulWidget {
-  final LatLng? initialPosition;
-  final String? imagePath;
-
-  const MapScreen({super.key, this.initialPosition, this.imagePath});
+  const MapScreen({super.key});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -20,8 +20,24 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialPosition != null && widget.imagePath != null) {
-      _addMarker(widget.initialPosition!, widget.imagePath!);
+    _loadPhotoSpots();
+  }
+
+  Future<void> _loadPhotoSpots() async {
+    final dataList = await DBHelper.getData('photo_spots');
+    final spots = dataList
+        .map(
+          (item) => PhotoSpot(
+            id: item['id'],
+            latitude: item['latitude'],
+            longitude: item['longitude'],
+            imagePath: item['imagePath'],
+          ),
+        )
+        .toList();
+
+    for (final spot in spots) {
+      _addMarker(spot);
     }
   }
 
@@ -46,18 +62,29 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  void _addMarker(LatLng position, String imagePath) {
-    setState(() {
-      _markers.add(
-        Marker(
-          markerId: MarkerId(position.toString()),
-          position: position,
-          onTap: () {
-            _showImageDialog(imagePath);
-          },
-        ),
+  void _addMarker(PhotoSpot spot) {
+      final marker = Marker(
+        markerId: MarkerId(spot.id.toString()),
+        position: spot.position,
+        onTap: () {
+          _showImageDialog(spot.imagePath);
+        },
       );
-    });
+      setState(() {
+          _markers.add(marker);
+      });
+  }
+
+  void _navigateAndAddNewSpot() async {
+    final newSpot = await Navigator.push<PhotoSpot>(
+      context,
+      MaterialPageRoute(builder: (context) => const CameraScreen()),
+    );
+
+    if (newSpot != null) {
+      _addMarker(newSpot);
+      mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
+    }
   }
 
   @override
@@ -66,11 +93,24 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: const Text('Snap GourmetLog'),
         backgroundColor: Colors.orange,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.photo_library),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PhotoListScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: GoogleMap(
         onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: widget.initialPosition ?? const LatLng(35.944, 140.051),
+        initialCameraPosition: const CameraPosition(
+          target: LatLng(35.944, 140.051), // Initial camera position
           zoom: 15.0,
         ),
         markers: _markers,
@@ -78,12 +118,7 @@ class _MapScreenState extends State<MapScreen> {
         myLocationButtonEnabled: true,
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CameraScreen()),
-          );
-        },
+        onPressed: _navigateAndAddNewSpot,
         child: const Icon(Icons.camera_alt),
       ),
     );

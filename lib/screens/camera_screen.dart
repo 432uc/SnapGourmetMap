@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'map_screen.dart';
+import '../helpers/db_helper.dart';
+import '../models/photo_spot.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -24,21 +24,16 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _initializeCamera() async {
-    // 必要な権限をリクエスト
     await [Permission.camera, Permission.location].request();
-
-    // 利用可能なカメラのリストを取得
     _cameras = await availableCameras();
-    
-    // 最初のカメラをコントローラーに設定
     _controller = CameraController(
       _cameras.first,
       ResolutionPreset.medium,
     );
-
-    // コントローラーを初期化
     _initializeControllerFuture = _controller.initialize();
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -53,23 +48,26 @@ class _CameraScreenState extends State<CameraScreen> {
 
       final image = await _controller.takePicture();
 
-      // 正確な位置情報を取得
       final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
+      final newSpot = PhotoSpot(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        imagePath: image.path,
+      );
+
+      await DBHelper.insert('photo_spots', newSpot.toMap());
+
       if (!mounted) return;
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MapScreen(
-            initialPosition: LatLng(position.latitude, position.longitude),
-            imagePath: image.path,
-          ),
-        ),
-      );
+      Navigator.of(context).pop(newSpot);
     } catch (e) {
-      print(e);
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
     }
   }
 
