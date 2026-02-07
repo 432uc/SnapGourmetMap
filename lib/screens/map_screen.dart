@@ -5,7 +5,8 @@ import '../helpers/db_helper.dart';
 import '../models/photo_spot.dart';
 import 'camera_screen.dart';
 import 'photo_list_screen.dart';
-import 'settings_screen.dart'; // Import settings screen
+import 'settings_screen.dart';
+import 'edit_spot_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -26,7 +27,6 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
-    // Clear existing markers before loading new ones
     setState(() {
       _markers.clear();
     });
@@ -42,12 +42,24 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _showImageDialog(PhotoSpot spot) {
-    // This can be enhanced to show category info
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        content: Image.file(File(spot.imagePath)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [Image.file(File(spot.imagePath))],
+        ),
         actions: <Widget>[
+          TextButton(
+            child: const Text('Edit'),
+            onPressed: () {
+              Navigator.of(context).pop(); // Close the dialog first
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: spot)),
+              ).then((_) => _loadPhotoSpots());
+            },
+          ),
           TextButton(
             child: const Text('Close'),
             onPressed: () {
@@ -79,7 +91,6 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     if (newSpot != null) {
-      // In the next phase, we will navigate to an Edit screen first.
       _addMarker(newSpot);
       mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
     }
@@ -114,7 +125,7 @@ class _MapScreenState extends State<MapScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              ).then((_) => _loadPhotoSpots()); // Refresh spots when returning
+              ).then((_) => _loadPhotoSpots());
             },
           ),
         ],
