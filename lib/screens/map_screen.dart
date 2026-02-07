@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'camera_screen.dart';
@@ -19,8 +20,8 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialPosition != null) {
-      _addMarker(widget.initialPosition!, widget.imagePath);
+    if (widget.initialPosition != null && widget.imagePath != null) {
+      _addMarker(widget.initialPosition!, widget.imagePath!);
     }
   }
 
@@ -28,15 +29,32 @@ class _MapScreenState extends State<MapScreen> {
     mapController = controller;
   }
 
-  void _addMarker(LatLng position, String? imagePath) {
+  void _showImageDialog(String imagePath) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Image.file(File(imagePath)),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Close'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addMarker(LatLng position, String imagePath) {
     setState(() {
       _markers.add(
         Marker(
           markerId: MarkerId(position.toString()),
           position: position,
-          infoWindow: const InfoWindow(
-            title: 'S'
-          ),
+          onTap: () {
+            _showImageDialog(imagePath);
+          },
         ),
       );
     });
