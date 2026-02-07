@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-// import 'package:geolocator/geolocator.dart'; // Will use later for current location
+import 'camera_screen.dart';
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final LatLng? initialPosition;
+  final String? imagePath;
+
+  const MapScreen({super.key, this.initialPosition, this.imagePath});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -11,24 +14,28 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-
-  /* 
-   Initial coordinates: 35.944, 140.051 (Toride Station area)
-  */
-  final LatLng _center = const LatLng(35.944, 140.051);
-
   final Set<Marker> _markers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialPosition != null) {
+      _addMarker(widget.initialPosition!, widget.imagePath);
+    }
+  }
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+  }
+
+  void _addMarker(LatLng position, String? imagePath) {
     setState(() {
       _markers.add(
-        const Marker(
-          markerId: MarkerId('sample_1'),
-          position: LatLng(35.944, 140.051),
-          infoWindow: InfoWindow(
-            title: 'Sample Spot',
-            snippet: 'This is a sample gourmet spot.',
+        Marker(
+          markerId: MarkerId(position.toString()),
+          position: position,
+          infoWindow: const InfoWindow(
+            title: 'S'
           ),
         ),
       );
@@ -45,18 +52,21 @@ class _MapScreenState extends State<MapScreen> {
       body: GoogleMap(
         onMapCreated: _onMapCreated,
         initialCameraPosition: CameraPosition(
-          target: _center,
+          target: widget.initialPosition ?? const LatLng(35.944, 140.051),
           zoom: 15.0,
         ),
         markers: _markers,
-        myLocationEnabled: true, // Requires permissions in AndroidManifest.xml
+        myLocationEnabled: true,
         myLocationButtonEnabled: true,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Placeholder for adding a new spot
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CameraScreen()),
+          );
         },
-        child: const Icon(Icons.add_location_alt),
+        child: const Icon(Icons.camera_alt),
       ),
     );
   }
