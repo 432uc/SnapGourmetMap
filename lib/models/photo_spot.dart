@@ -3,8 +3,8 @@ import 'order_item.dart';
 
 class PhotoSpot {
   final int? id;
-  final double latitude;
-  final double longitude;
+  final double? latitude;   // Made nullable
+  final double? longitude;  // Made nullable
   final String imagePath;
   final int? categoryId;
   final int? subCategoryId;
@@ -16,8 +16,8 @@ class PhotoSpot {
 
   PhotoSpot({
     this.id,
-    required this.latitude,
-    required this.longitude,
+    this.latitude,         // No longer required
+    this.longitude,        // No longer required
     required this.imagePath,
     this.categoryId,
     this.subCategoryId,
@@ -28,7 +28,8 @@ class PhotoSpot {
     this.orders = const [],
   });
 
-  LatLng get position => LatLng(latitude, longitude);
+  // A getter that can fail if lat/lng are null.
+  LatLng get position => LatLng(latitude!, longitude!);
 
   Map<String, dynamic> toMap() {
     return {
@@ -58,7 +59,7 @@ class PhotoSpot {
       rating: map['rating'],
       visitCount: map['visitCount'],
       notes: map['notes'],
-      orders: map['ordersJson'] != null ? OrderItem.decode(map['ordersJson']) : [],
+      orders: map['ordersJson'] != null && map['ordersJson'].isNotEmpty ? OrderItem.decode(map['ordersJson']) : [],
     );
   }
 }

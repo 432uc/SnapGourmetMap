@@ -33,14 +33,17 @@ class _MapScreenState extends State<MapScreen> {
     
     final Set<Marker> newMarkers = {};
     for (final spot in spots) {
-      newMarkers.add(
-        Marker(
-          markerId: MarkerId(spot.id.toString()),
-          position: spot.position,
-          infoWindow: InfoWindow(title: spot.shopName ?? 'Spot #${spot.id}'),
-          onTap: () => _showImageDialog(spot),
-        ),
-      );
+      // Add marker only if location data is valid.
+      if (spot.latitude != null && spot.longitude != null) {
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId(spot.id.toString()),
+            position: spot.position,
+            infoWindow: InfoWindow(title: spot.shopName ?? 'Spot #${spot.id}'),
+            onTap: () => _showImageDialog(spot),
+          ),
+        );
+      }
     }
 
     if (mounted) {
@@ -116,19 +119,15 @@ class _MapScreenState extends State<MapScreen> {
       final latRefTag = exifData['GPS GPSLatitudeRef'];
       final lonRefTag = exifData['GPS GPSLongitudeRef'];
 
-      if (latTag == null || lonTag == null || latRefTag == null || lonRefTag == null) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No location data found in this photo.')));
-        return;
+      double? latitude;
+      double? longitude;
+
+      if (latTag != null && lonTag != null && latRefTag != null && lonRefTag != null) {
+        latitude = _convertDmsToDecimal(latTag.values.toList().cast<exif.Ratio>(), latRefTag.toString());
+        longitude = _convertDmsToDecimal(lonTag.values.toList().cast<exif.Ratio>(), lonRefTag.toString());
       }
-
-      final double? latitude = _convertDmsToDecimal(latTag.values.toList().cast<exif.Ratio>(), latRefTag.toString());
-      final double? longitude = _convertDmsToDecimal(lonTag.values.toList().cast<exif.Ratio>(), lonRefTag.toString());
-
-      if (latitude == null || longitude == null) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not parse location data.')));
-        return;
-      }
-
+      
+      // Create a spot, possibly without location.
       final tempSpot = PhotoSpot(latitude: latitude, longitude: longitude, imagePath: image.path);
 
       if (!mounted) return;
@@ -138,7 +137,9 @@ class _MapScreenState extends State<MapScreen> {
 
       if (newSpot != null) {
         await _loadPhotoSpots();
-        mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
+        if (newSpot.latitude != null && newSpot.longitude != null) {
+           mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
+        }
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error processing image: ${e.toString()}')));
@@ -149,13 +150,15 @@ class _MapScreenState extends State<MapScreen> {
     final newSpot = await Navigator.push<PhotoSpot>(context, MaterialPageRoute(builder: (context) => const CameraScreen()));
     if (newSpot != null) {
       await _loadPhotoSpots();
-      mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
+      if (newSpot.latitude != null && newSpot.longitude != null) {
+        mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
+      }
     }
   }
 
   void _navigateToPhotoList() async {
     final selectedSpot = await Navigator.push<PhotoSpot>(context, MaterialPageRoute(builder: (context) => const PhotoListScreen()));
-    if (selectedSpot != null) {
+    if (selectedSpot != null && selectedSpot.latitude != null && selectedSpot.longitude != null) {
       mapController.animateCamera(CameraUpdate.newLatLng(selectedSpot.position));
       mapController.showMarkerInfoWindow(MarkerId(selectedSpot.id.toString()));
     }

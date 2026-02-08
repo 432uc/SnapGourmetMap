@@ -38,7 +38,7 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     _notesController = TextEditingController(text: widget.photoSpot.notes);
     _selectedRating = widget.photoSpot.rating;
     _selectedVisitCount = widget.photoSpot.visitCount;
-    _orders = List.from(widget.photoSpot.orders); // Create a mutable copy
+    _orders = List.from(widget.photoSpot.orders);
     _initializeScreen();
   }
 
@@ -91,15 +91,14 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     try {
-      // Final check for location data before saving.
       if (widget.photoSpot.latitude == null || widget.photoSpot.longitude == null) {
-        throw Exception('Latitude or Longitude is invalid.');
+        throw Exception('Location data is missing. Cannot save spot.');
       }
 
       final spotToSave = PhotoSpot(
         id: widget.photoSpot.id,
-        latitude: widget.photoSpot.latitude,
-        longitude: widget.photoSpot.longitude,
+        latitude: widget.photoSpot.latitude!,
+        longitude: widget.photoSpot.longitude!,
         imagePath: widget.photoSpot.imagePath,
         categoryId: _selectedCategory?.id,
         subCategoryId: _selectedSubCategory?.id,
