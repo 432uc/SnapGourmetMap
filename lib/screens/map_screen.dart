@@ -25,12 +25,14 @@ class _MapScreenState extends State<MapScreen> {
     _loadPhotoSpots();
   }
 
+  // Reverted to the simpler, stable version of loading spots.
   Future<void> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
+    final spots = dataList.map((item) => PhotoSpot.fromMap(item)).toList();
+    
     setState(() {
       _markers.clear();
     });
-    final spots = dataList.map((item) => PhotoSpot.fromMap(item)).toList();
 
     for (final spot in spots) {
       _addMarker(spot);
@@ -63,7 +65,7 @@ class _MapScreenState extends State<MapScreen> {
           TextButton(
             child: const Text('Edit'),
             onPressed: () {
-              Navigator.of(context).pop(); // Close the dialog first
+              Navigator.of(context).pop();
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: spot)),
@@ -79,6 +81,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  // Restored the simple _addMarker method.
   void _addMarker(PhotoSpot spot) {
     final marker = Marker(
       markerId: MarkerId(spot.id.toString()),
@@ -93,6 +96,7 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  // Reverted to use _addMarker for consistency.
   void _navigateAndAddNewSpot() async {
     final newSpot = await Navigator.push<PhotoSpot>(
       context,
@@ -124,6 +128,7 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('Snap GourmetLog'),
         backgroundColor: Colors.orange,
         actions: [
+          // Reverted: The visibility toggle button has been removed.
           IconButton(
             icon: const Icon(Icons.photo_library),
             onPressed: _navigateToPhotoList,
