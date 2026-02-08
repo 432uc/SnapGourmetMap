@@ -22,14 +22,14 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
 
   void _refreshPhotoSpots() {
     setState(() {
-        _photoSpotsFuture = _loadPhotoSpots();
+      _photoSpotsFuture = _loadPhotoSpots();
     });
   }
 
   Future<List<PhotoSpot>> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
-    // Sort by id descending to show newest first
     dataList.sort((a, b) => (b['id'] as int).compareTo(a['id'] as int));
+    // This will now throw an error if fromMap fails, which will be caught by the FutureBuilder.
     return dataList.map((item) => PhotoSpot.fromMap(item)).toList();
   }
 
@@ -67,12 +67,26 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
       body: FutureBuilder<List<PhotoSpot>>(
         future: _photoSpotsFuture,
         builder: (context, snapshot) {
+          // ** Step 1: Add error handling **
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'An error occurred:\n\n${snapshot.error}',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            );
+          }
+          
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('No photos yet!'));
           }
+
           final spots = snapshot.data!;
           return ListView.builder(
             itemCount: spots.length,

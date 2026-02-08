@@ -17,7 +17,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-  final Set<Marker> _markers = {};
+  Set<Marker> _markers = {}; // Not final
 
   @override
   void initState() {
@@ -25,17 +25,29 @@ class _MapScreenState extends State<MapScreen> {
     _loadPhotoSpots();
   }
 
-  // Reverted to the simpler, stable version of loading spots.
+  // Unified and efficient method to load and display all markers.
   Future<void> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
     final spots = dataList.map((item) => PhotoSpot.fromMap(item)).toList();
     
-    setState(() {
-      _markers.clear();
-    });
-
+    final Set<Marker> newMarkers = {};
     for (final spot in spots) {
-      _addMarker(spot);
+      newMarkers.add(
+        Marker(
+          markerId: MarkerId(spot.id.toString()),
+          position: spot.position,
+          infoWindow: InfoWindow(title: spot.shopName ?? 'Spot #${spot.id}'),
+          onTap: () {
+            _showImageDialog(spot);
+          },
+        ),
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _markers = newMarkers;
+      });
     }
   }
 
@@ -81,22 +93,8 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // Restored the simple _addMarker method.
-  void _addMarker(PhotoSpot spot) {
-    final marker = Marker(
-      markerId: MarkerId(spot.id.toString()),
-      position: spot.position,
-      infoWindow: InfoWindow(title: spot.shopName ?? 'Spot #${spot.id}'),
-      onTap: () {
-        _showImageDialog(spot);
-      },
-    );
-    setState(() {
-      _markers.add(marker);
-    });
-  }
+  // _addMarker is no longer needed.
 
-  // Reverted to use _addMarker for consistency.
   void _navigateAndAddNewSpot() async {
     final newSpot = await Navigator.push<PhotoSpot>(
       context,
@@ -104,21 +102,17 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     if (newSpot != null) {
-      _addMarker(newSpot);
+      await _loadPhotoSpots(); 
       mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
     }
   }
 
-  void _navigateToPhotoList() async {
-    final selectedSpot = await Navigator.push<PhotoSpot>(
+  void _navigateToPhotoList() {
+    // Simplified: Just navigate. The list screen will fetch its own fresh data.
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const PhotoListScreen()),
     );
-
-    if (selectedSpot != null) {
-      mapController.animateCamera(CameraUpdate.newLatLng(selectedSpot.position));
-      _showImageDialog(selectedSpot);
-    }
   }
 
   @override
@@ -128,7 +122,6 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('Snap GourmetLog'),
         backgroundColor: Colors.orange,
         actions: [
-          // Reverted: The visibility toggle button has been removed.
           IconButton(
             icon: const Icon(Icons.photo_library),
             onPressed: _navigateToPhotoList,
@@ -158,7 +151,7 @@ class _MapScreenState extends State<MapScreen> {
         onPressed: _navigateAndAddNewSpot,
         child: const Icon(Icons.camera_alt),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat, // This line is added
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
