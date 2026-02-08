@@ -28,6 +28,8 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
 
   Future<List<PhotoSpot>> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
+    // Sort by id descending to show newest first
+    dataList.sort((a, b) => (b['id'] as int).compareTo(a['id'] as int));
     return dataList.map((item) => PhotoSpot.fromMap(item)).toList();
   }
 
@@ -79,13 +81,19 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
               return Card(
                 margin: const EdgeInsets.all(8.0),
                 child: ListTile(
-                  leading: Image.file(File(spot.imagePath), width: 100, fit: BoxFit.cover),
-                  title: Text('Spot #${spot.id}'),
-                  subtitle: FutureBuilder<String>(
-                    future: _getCategoryInfo(spot),
-                    builder: (context, catSnapshot) {
-                      return Text(catSnapshot.data ?? 'Loading...');
-                    },
+                  leading: Image.file(File(spot.imagePath), width: 100, fit: BoxFit.cover, errorBuilder: (c, o, s) => const Icon(Icons.error)),
+                  title: Text(spot.shopName ?? 'Spot #${spot.id}'),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (spot.rating != null) Text('★' * spot.rating!),
+                      FutureBuilder<String>(
+                        future: _getCategoryInfo(spot),
+                        builder: (context, catSnapshot) {
+                          return Text(catSnapshot.data ?? 'Loading...');
+                        },
+                      ),
+                    ],
                   ),
                   trailing: IconButton(
                     icon: const Icon(Icons.edit),

@@ -45,9 +45,19 @@ class _MapScreenState extends State<MapScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [Image.file(File(spot.imagePath))],
+        title: Text(spot.shopName ?? 'Spot #${spot.id}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (spot.rating != null) Text('Rating: ' + '★' * spot.rating!),
+              const SizedBox(height: 8),
+              Image.file(File(spot.imagePath), errorBuilder: (c, o, s) => const Icon(Icons.error)),
+              const SizedBox(height: 8),
+              if(spot.notes != null && spot.notes!.isNotEmpty) Text(spot.notes!),
+            ],
+          ),
         ),
         actions: <Widget>[
           TextButton(
@@ -62,9 +72,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
           TextButton(
             child: const Text('Close'),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
+            onPressed: () => Navigator.of(context).pop(),
           ),
         ],
       ),
@@ -75,6 +83,7 @@ class _MapScreenState extends State<MapScreen> {
     final marker = Marker(
       markerId: MarkerId(spot.id.toString()),
       position: spot.position,
+      infoWindow: InfoWindow(title: spot.shopName ?? 'Spot #${spot.id}'),
       onTap: () {
         _showImageDialog(spot);
       },

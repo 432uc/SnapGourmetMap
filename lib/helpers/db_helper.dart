@@ -3,7 +3,7 @@ import 'package:path/path.dart' as path;
 
 class DBHelper {
   static const String _databaseName = 'spots.db';
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3; // <-- Version incremented
 
   static Future<sql.Database> database() async {
     final dbPath = await sql.getDatabasesPath();
@@ -16,8 +16,9 @@ class DBHelper {
   }
 
   static Future _onCreate(sql.Database db, int version) async {
+    // Create tables for the latest version from scratch
     await db.execute(
-        'CREATE TABLE photo_spots(id INTEGER PRIMARY KEY AUTOINCREMENT, latitude REAL, longitude REAL, imagePath TEXT, categoryId INTEGER, subCategoryId INTEGER)');
+        'CREATE TABLE photo_spots(id INTEGER PRIMARY KEY AUTOINCREMENT, latitude REAL, longitude REAL, imagePath TEXT, categoryId INTEGER, subCategoryId INTEGER, shopName TEXT, rating INTEGER, visitCount TEXT, notes TEXT, ordersJson TEXT)');
     await db.execute(
         'CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)');
     await db.execute(
@@ -26,13 +27,20 @@ class DBHelper {
 
   static Future _onUpgrade(sql.Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      // In a real app, you would likely migrate data. Here we are just adding columns.
       await db.execute('ALTER TABLE photo_spots ADD COLUMN categoryId INTEGER');
       await db.execute('ALTER TABLE photo_spots ADD COLUMN subCategoryId INTEGER');
       await db.execute(
           'CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)');
       await db.execute(
           'CREATE TABLE sub_categories(id INTEGER PRIMARY KEY AUTOINCREMENT, categoryId INTEGER, name TEXT, FOREIGN KEY (categoryId) REFERENCES categories(id) ON DELETE CASCADE)');
+    }
+    if (oldVersion < 3) {
+      // Add columns for version 3
+      await db.execute('ALTER TABLE photo_spots ADD COLUMN shopName TEXT');
+      await db.execute('ALTER TABLE photo_spots ADD COLUMN rating INTEGER');
+      await db.execute('ALTER TABLE photo_spots ADD COLUMN visitCount TEXT');
+      await db.execute('ALTER TABLE photo_spots ADD COLUMN notes TEXT');
+      await db.execute('ALTER TABLE photo_spots ADD COLUMN ordersJson TEXT');
     }
   }
 

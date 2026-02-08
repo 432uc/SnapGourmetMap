@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../helpers/db_helper.dart';
 import '../models/category.dart';
 import '../models/sub_category.dart';
 import '../models/photo_spot.dart';
+import '../models/order_item.dart';
 
 class EditSpotScreen extends StatefulWidget {
   final PhotoSpot photoSpot;
@@ -15,8 +17,16 @@ class EditSpotScreen extends StatefulWidget {
 }
 
 class _EditSpotScreenState extends State<EditSpotScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _shopNameController;
+  late TextEditingController _notesController;
+  
   Category? _selectedCategory;
   SubCategory? _selectedSubCategory;
+  int? _selectedRating;
+  String? _selectedVisitCount;
+  List<OrderItem> _orders = [];
+
   List<Category> _categories = [];
   List<SubCategory> _subCategories = [];
   bool _isLoading = true;
@@ -24,6 +34,11 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
   @override
   void initState() {
     super.initState();
+    _shopNameController = TextEditingController(text: widget.photoSpot.shopName);
+    _notesController = TextEditingController(text: widget.photoSpot.notes);
+    _selectedRating = widget.photoSpot.rating;
+    _selectedVisitCount = widget.photoSpot.visitCount;
+    _orders = List.from(widget.photoSpot.orders); // Create a mutable copy
     _initializeScreen();
   }
 
@@ -36,9 +51,7 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
         _selectedSubCategory = _subCategories.firstWhere((sub) => sub.id == widget.photoSpot.subCategoryId, orElse: () => _subCategories.first);
       }
     }
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
   }
 
   Future<void> _loadCategories() async {
@@ -62,31 +75,43 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     }
   }
 
+  void _addOrderItem() {
+    setState(() {
+      _orders.add(OrderItem());
+    });
+  }
+
+  void _removeOrderItem(int index) {
+    setState(() {
+      _orders.removeAt(index);
+    });
+  }
+
   Future<void> _saveSpot() async {
-    final spotWithCategories = PhotoSpot(
+    if (!_formKey.currentState!.validate()) return;
+
+    final spotToSave = PhotoSpot(
       id: widget.photoSpot.id,
       latitude: widget.photoSpot.latitude,
       longitude: widget.photoSpot.longitude,
       imagePath: widget.photoSpot.imagePath,
       categoryId: _selectedCategory?.id,
       subCategoryId: _selectedSubCategory?.id,
+      shopName: _shopNameController.text,
+      rating: _selectedRating,
+      visitCount: _selectedVisitCount,
+      notes: _notesController.text,
+      orders: _orders,
     );
 
-    if (spotWithCategories.id != null) {
-      // Update existing spot
-      await DBHelper.update('photo_spots', spotWithCategories.toMap(), spotWithCategories.id!);
+    if (spotToSave.id != null) {
+      await DBHelper.update('photo_spots', spotToSave.toMap(), spotToSave.id!);
+      if (mounted) Navigator.of(context).pop();
     } else {
-      // Insert new spot
-      final newId = await DBHelper.insert('photo_spots', spotWithCategories.toMap());
-      // Create a final spot object with the new ID to return
+      final newId = await DBHelper.insert('photo_spots', spotToSave.toMap());
       final finalSpot = PhotoSpot.fromMap((await DBHelper.getDataWhere('photo_spots', 'id = ?', [newId])).first);
-      if (mounted) {
-          Navigator.of(context).pop(finalSpot);
-          return; // Exit after popping for new spot
-      }
+      if (mounted) Navigator.of(context).pop(finalSpot);
     }
-    // For updates, we can just pop. The calling screen will handle refresh.
-    if(mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -94,54 +119,53 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.photoSpot.id == null ? 'Add Spot Details' : 'Edit Spot Details'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveSpot,
-          )
-        ],
+        actions: [IconButton(icon: const Icon(Icons.save), onPressed: _saveSpot)],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Image.file(File(widget.photoSpot.imagePath)),
-                  const SizedBox(height: 20),
-                  DropdownButtonFormField<Category>(
-                    value: _selectedCategory,
-                    hint: const Text('Select Genre'),
-                    items: _categories.map((Category category) {
-                      return DropdownMenuItem<Category>(
-                        value: category,
-                        child: Text(category.name),
-                      );
-                    }).toList(),
-                    onChanged: _onCategoryChanged,
-                    decoration: const InputDecoration(labelText: 'Genre'),
-                  ),
-                  const SizedBox(height: 20),
-                  DropdownButtonFormField<SubCategory>(
-                    value: _selectedSubCategory,
-                    hint: const Text('Select Taste/Details'),
-                    items: _subCategories.map((SubCategory subCategory) {
-                      return DropdownMenuItem<SubCategory>(
-                        value: subCategory,
-                        child: Text(subCategory.name),
-                      );
-                    }).toList(),
-                    onChanged: (SubCategory? newSubCategory) {
-                      setState(() {
-                        _selectedSubCategory = newSubCategory;
-                      });
-                    },
-                    decoration: const InputDecoration(labelText: 'Taste/Details'),
-                  ),
-                ],
+          : Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Image.file(File(widget.photoSpot.imagePath)),
+                    const SizedBox(height: 20),
+                    TextFormField(controller: _shopNameController, maxLength: 50, decoration: const InputDecoration(labelText: 'Shop Name')),
+                    DropdownButtonFormField<int>(value: _selectedRating, hint: const Text('Rating'), items: [1, 2, 3, 4, 5].map((r) => DropdownMenuItem(value: r, child: Text('★' * r))).toList(), onChanged: (val) => setState(() => _selectedRating = val)),
+                    DropdownButtonFormField<String>(value: _selectedVisitCount, hint: const Text('Visit Count'), items: ['1 time', '2 times', '3+ times'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(), onChanged: (val) => setState(() => _selectedVisitCount = val)),
+                    DropdownButtonFormField<Category>(value: _selectedCategory, hint: const Text('Select Genre'), items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c.name))).toList(), onChanged: _onCategoryChanged, decoration: const InputDecoration(labelText: 'Genre')),
+                    DropdownButtonFormField<SubCategory>(value: _selectedSubCategory, hint: const Text('Select Taste/Details'), items: _subCategories.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(), onChanged: (val) => setState(() => _selectedSubCategory = val), decoration: const InputDecoration(labelText: 'Taste/Details')),
+                    const SizedBox(height: 20),
+                    Text('Orders', style: Theme.of(context).textTheme.titleLarge),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _orders.length,
+                      itemBuilder: (context, index) {
+                        return Row(
+                          children: [
+                            Expanded(child: TextFormField(initialValue: _orders[index].itemName, decoration: const InputDecoration(labelText: 'Item'), onChanged: (val) => _orders[index].itemName = val)),
+                            const SizedBox(width: 8),
+                            SizedBox(width: 100, child: TextFormField(initialValue: _orders[index].price?.toString() ?? '', decoration: const InputDecoration(labelText: 'Price', suffixText: 'yen'), keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], onChanged: (val) => _orders[index].price = int.tryParse(val))),
+                            IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => _removeOrderItem(index)),
+                          ],
+                        );
+                      },
+                    ),
+                    Align(alignment: Alignment.centerRight, child: IconButton(icon: const Icon(Icons.add_circle), onPressed: _addOrderItem)),
+                    TextFormField(controller: _notesController, decoration: const InputDecoration(labelText: 'Notes'), maxLines: 3),
+                  ],
+                ),
               ),
             ),
     );
+  }
+   @override
+  void dispose() {
+    _shopNameController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 }
