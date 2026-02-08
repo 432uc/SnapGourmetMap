@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+// Defines the search behavior for price filtering.
+enum PriceSearchMode { firstItem, total }
+
 class OrderItem {
   String itemName;
   int? price;

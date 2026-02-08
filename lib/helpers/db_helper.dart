@@ -69,7 +69,6 @@ class DBHelper {
     return db.delete(table, where: 'id = ?', whereArgs: [id]);
   }
 
-  // New powerful search method
   static Future<List<PhotoSpot>> searchSpots({
     String? keyword,
     int? categoryId,
@@ -77,6 +76,7 @@ class DBHelper {
     String? visitCount,
     int? minPrice,
     int? maxPrice,
+    PriceSearchMode priceMode = PriceSearchMode.firstItem, // Default mode
   }) async {
     final db = await DBHelper.database();
     List<String> whereClauses = [];
@@ -91,7 +91,6 @@ class DBHelper {
       whereArgs.add(categoryId);
     }
     if (rating != null) {
-      // Search for rating or higher
       whereClauses.add('rating >= ?');
       whereArgs.add(rating);
     }
@@ -111,20 +110,25 @@ class DBHelper {
 
     List<PhotoSpot> spots = maps.map((map) => PhotoSpot.fromMap(map)).toList();
 
-    // Secondary filtering in Dart for conditions not easily handled in SQL
+    // Dart-side filtering for price range based on the selected mode
     if (minPrice != null || maxPrice != null) {
       spots.retainWhere((spot) {
-        // If a spot has no orders, it can't match a price range.
         if (spot.orders.isEmpty) return false;
 
-        return spot.orders.any((order) {
-          final price = order.price;
-          if (price == null) return false; // Order must have a price to be included in range search
-          
-          bool minOk = minPrice == null || price >= minPrice;
-          bool maxOk = maxPrice == null || price <= maxPrice;
+        if (priceMode == PriceSearchMode.total) {
+          // Sum of all item prices
+          int total = spot.orders.fold(0, (sum, item) => sum + (item.price ?? 0));
+          bool minOk = minPrice == null || total >= minPrice;
+          bool maxOk = maxPrice == null || total <= maxPrice;
           return minOk && maxOk;
-        });
+        } else {
+          // Price of the first item
+          final firstPrice = spot.orders.first.price;
+          if (firstPrice == null) return false;
+          bool minOk = minPrice == null || firstPrice >= minPrice;
+          bool maxOk = maxPrice == null || firstPrice <= maxPrice;
+          return minOk && maxOk;
+        }
       });
     }
 
