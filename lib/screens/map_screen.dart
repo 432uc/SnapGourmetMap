@@ -85,6 +85,34 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
           TextButton(
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Confirm Deletion'),
+                  content: Text('Are you sure you want to delete "${spot.shopName ?? 'this spot'}"?'),
+                  actions: <Widget>[
+                    TextButton(
+                      child: const Text('Cancel'),
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                    ),
+                    TextButton(
+                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                    ),
+                  ],
+                ),
+              );
+
+              if (confirm == true) {
+                if(mounted) Navigator.of(context).pop(); // Close the main info dialog
+                await DBHelper.delete('photo_spots', spot.id!);
+                _loadPhotoSpots();
+              }
+            },
+          ),
+          TextButton(
             child: const Text('Close'),
             onPressed: () => Navigator.of(context).pop(),
           ),

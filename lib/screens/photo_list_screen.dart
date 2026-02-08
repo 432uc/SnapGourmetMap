@@ -86,11 +86,35 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
     _performSearch();
   }
 
+  void _deleteSpot(PhotoSpot spot) async {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content: Text('Are you sure you want to delete "${spot.shopName ?? 'this spot'}"?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(ctx).pop(false),
+            ),
+            TextButton(
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onPressed: () => Navigator.of(ctx).pop(true),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        await DBHelper.delete('photo_spots', spot.id!);
+        _performSearch(); // Refresh the list
+      }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Your Photos')),
-      // Wrap the body in SingleChildScrollView to prevent overflow when keyboard appears.
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -137,7 +161,6 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
                 )
               ],
             ),
-            // Removed Expanded and modified the FutureBuilder and ListView
             FutureBuilder<List<PhotoSpot>>(
               future: _photoSpotsFuture,
               builder: (context, snapshot) {
@@ -147,8 +170,8 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
 
                 final spots = snapshot.data!;
                 return ListView.builder(
-                  shrinkWrap: true, // Allow ListView to size itself to its content
-                  physics: const NeverScrollableScrollPhysics(), // Prevent nested scrolling
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: spots.length,
                   itemBuilder: (context, index) {
                     final spot = spots[index];
@@ -158,7 +181,13 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
                         leading: Image.file(File(spot.imagePath), width: 100, fit: BoxFit.cover, errorBuilder: (c, o, s) => const Icon(Icons.error, size: 40)),
                         title: Text(spot.shopName ?? 'Spot #${spot.id}'),
                         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (spot.rating != null) Text('★' * spot.rating!), FutureBuilder<String>(future: _getCategoryInfo(spot), builder: (context, catSnapshot) => Text(catSnapshot.data ?? 'Loading...'))]),
-                        trailing: IconButton(icon: const Icon(Icons.edit), onPressed: () => _navigateToEditScreen(spot)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(icon: const Icon(Icons.edit), onPressed: () => _navigateToEditScreen(spot)),
+                            IconButton(icon: const Icon(Icons.delete), color: Colors.red.withOpacity(0.7), onPressed: () => _deleteSpot(spot)),
+                          ],
+                        ),
                         onTap: () => Navigator.of(context).pop(spot),
                       ),
                     );
