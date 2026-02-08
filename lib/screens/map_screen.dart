@@ -158,6 +158,7 @@ class _MapScreenState extends State<MapScreen> {
         onPressed: _navigateAndAddNewSpot,
         child: const Icon(Icons.camera_alt),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat, // This line is added
     );
   }
 }

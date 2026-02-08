@@ -99,6 +99,7 @@ class _CameraScreenState extends State<CameraScreen> {
         onPressed: _takePicture,
         child: const Icon(Icons.camera_alt),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat, // This line is added
     );
   }
 }
