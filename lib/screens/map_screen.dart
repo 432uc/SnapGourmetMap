@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:exif/exif.dart';
 import '../helpers/db_helper.dart';
 import '../models/photo_spot.dart';
 import 'camera_screen.dart';
@@ -25,7 +27,6 @@ class _MapScreenState extends State<MapScreen> {
     _loadPhotoSpots();
   }
 
-  // Unified and efficient method to load and display all markers.
   Future<void> _loadPhotoSpots() async {
     final dataList = await DBHelper.getData('photo_spots');
     final spots = dataList.map((item) => PhotoSpot.fromMap(item)).toList();
@@ -37,17 +38,13 @@ class _MapScreenState extends State<MapScreen> {
           markerId: MarkerId(spot.id.toString()),
           position: spot.position,
           infoWindow: InfoWindow(title: spot.shopName ?? 'Spot #${spot.id}'),
-          onTap: () {
-            _showImageDialog(spot);
-          },
+          onTap: () => _showImageDialog(spot),
         ),
       );
     }
 
     if (mounted) {
-      setState(() {
-        _markers = newMarkers;
-      });
+      setState(() => _markers = newMarkers);
     }
   }
 
@@ -93,26 +90,75 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  // _addMarker is no longer needed.
+  double? _convertDmsToDecimal(List<Ratio>? dms, String? ref) {
+    if (dms == null || dms.length != 3 || ref == null) return null;
+    try {
+      double degrees = dms[0].toDouble();
+      double minutes = dms[1].toDouble();
+      double seconds = dms[2].toDouble();
+      double decimal = degrees + (minutes / 60) + (seconds / 3600);
+      return (ref == 'S' || ref == 'W') ? -decimal : decimal;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (image == null) return;
+
+      final fileBytes = await image.readAsBytes();
+      final exifData = await readExifFromBytes(fileBytes);
+
+      final latTag = exifData['GPS GPSLatitude'];
+      final lonTag = exifData['GPS GPSLongitude'];
+      final latRefTag = exifData['GPS GPSLatitudeRef'];
+      final lonRefTag = exifData['GPS GPSLongitudeRef'];
+
+      if (latTag == null || lonTag == null || latRefTag == null || lonRefTag == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No location data found in this photo.')));
+        return;
+      }
+
+      final double? latitude = _convertDmsToDecimal(latTag.values.toList().cast<Ratio>(), latRefTag.toString());
+      final double? longitude = _convertDmsToDecimal(lonTag.values.toList().cast<Ratio>(), lonRefTag.toString());
+
+      if (latitude == null || longitude == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not parse location data.')));
+        return;
+      }
+
+      final tempSpot = PhotoSpot(latitude: latitude, longitude: longitude, imagePath: image.path);
+
+      if (!mounted) return;
+      final newSpot = await Navigator.of(context).push<PhotoSpot>(
+        MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: tempSpot)),
+      );
+
+      if (newSpot != null) {
+        await _loadPhotoSpots();
+        mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error processing image: ${e.toString()}')));
+    }
+  }
 
   void _navigateAndAddNewSpot() async {
-    final newSpot = await Navigator.push<PhotoSpot>(
-      context,
-      MaterialPageRoute(builder: (context) => const CameraScreen()),
-    );
-
+    final newSpot = await Navigator.push<PhotoSpot>(context, MaterialPageRoute(builder: (context) => const CameraScreen()));
     if (newSpot != null) {
-      await _loadPhotoSpots(); 
+      await _loadPhotoSpots();
       mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
     }
   }
 
-  void _navigateToPhotoList() {
-    // Simplified: Just navigate. The list screen will fetch its own fresh data.
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const PhotoListScreen()),
-    );
+  void _navigateToPhotoList() async {
+    final selectedSpot = await Navigator.push<PhotoSpot>(context, MaterialPageRoute(builder: (context) => const PhotoListScreen()));
+    if (selectedSpot != null) {
+      mapController.animateCamera(CameraUpdate.newLatLng(selectedSpot.position));
+      mapController.showMarkerInfoWindow(MarkerId(selectedSpot.id.toString()));
+    }
   }
 
   @override
@@ -123,26 +169,25 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: Colors.orange,
         actions: [
           IconButton(
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            onPressed: _pickFromGallery,
+            tooltip: 'Import from Gallery',
+          ),
+          IconButton(
             icon: const Icon(Icons.photo_library),
             onPressed: _navigateToPhotoList,
           ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              ).then((_) => _loadPhotoSpots());
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())).then((_) => _loadPhotoSpots());
             },
           ),
         ],
       ),
       body: GoogleMap(
         onMapCreated: _onMapCreated,
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(35.944, 140.051),
-          zoom: 15.0,
-        ),
+        initialCameraPosition: const CameraPosition(target: LatLng(35.944, 140.051), zoom: 15.0),
         markers: _markers,
         myLocationEnabled: true,
         myLocationButtonEnabled: true,
