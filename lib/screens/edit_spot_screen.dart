@@ -44,11 +44,11 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
 
   Future<void> _initializeScreen() async {
     await _loadCategories();
-    if (widget.photoSpot.categoryId != null) {
-      _selectedCategory = _categories.firstWhere((cat) => cat.id == widget.photoSpot.categoryId, orElse: () => _categories.first);
+    if (widget.photoSpot.categoryId != null && _categories.any((c) => c.id == widget.photoSpot.categoryId)) {
+      _selectedCategory = _categories.firstWhere((cat) => cat.id == widget.photoSpot.categoryId);
       await _loadSubCategories(widget.photoSpot.categoryId!);
-      if (widget.photoSpot.subCategoryId != null) {
-        _selectedSubCategory = _subCategories.firstWhere((sub) => sub.id == widget.photoSpot.subCategoryId, orElse: () => _subCategories.first);
+      if (widget.photoSpot.subCategoryId != null && _subCategories.any((s) => s.id == widget.photoSpot.subCategoryId)) {
+        _selectedSubCategory = _subCategories.firstWhere((sub) => sub.id == widget.photoSpot.subCategoryId);
       }
     }
     setState(() => _isLoading = false);
@@ -88,29 +88,51 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
   }
 
   Future<void> _saveSpot() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    final spotToSave = PhotoSpot(
-      id: widget.photoSpot.id,
-      latitude: widget.photoSpot.latitude,
-      longitude: widget.photoSpot.longitude,
-      imagePath: widget.photoSpot.imagePath,
-      categoryId: _selectedCategory?.id,
-      subCategoryId: _selectedSubCategory?.id,
-      shopName: _shopNameController.text,
-      rating: _selectedRating,
-      visitCount: _selectedVisitCount,
-      notes: _notesController.text,
-      orders: _orders,
-    );
+    try {
+      // Final check for location data before saving.
+      if (widget.photoSpot.latitude == null || widget.photoSpot.longitude == null) {
+        throw Exception('Latitude or Longitude is invalid.');
+      }
 
-    if (spotToSave.id != null) {
-      await DBHelper.update('photo_spots', spotToSave.toMap(), spotToSave.id!);
-      if (mounted) Navigator.of(context).pop();
-    } else {
-      final newId = await DBHelper.insert('photo_spots', spotToSave.toMap());
-      final finalSpot = PhotoSpot.fromMap((await DBHelper.getDataWhere('photo_spots', 'id = ?', [newId])).first);
-      if (mounted) Navigator.of(context).pop(finalSpot);
+      final spotToSave = PhotoSpot(
+        id: widget.photoSpot.id,
+        latitude: widget.photoSpot.latitude,
+        longitude: widget.photoSpot.longitude,
+        imagePath: widget.photoSpot.imagePath,
+        categoryId: _selectedCategory?.id,
+        subCategoryId: _selectedSubCategory?.id,
+        shopName: _shopNameController.text,
+        rating: _selectedRating,
+        visitCount: _selectedVisitCount,
+        notes: _notesController.text,
+        orders: _orders,
+      );
+
+      if (spotToSave.id != null) {
+        await DBHelper.update('photo_spots', spotToSave.toMap(), spotToSave.id!);
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        final newId = await DBHelper.insert('photo_spots', spotToSave.toMap());
+        if (newId > 0) {
+            final results = await DBHelper.getDataWhere('photo_spots', 'id = ?', [newId]);
+            if (results.isNotEmpty) {
+                 final finalSpot = PhotoSpot.fromMap(results.first);
+                 if (mounted) Navigator.of(context).pop(finalSpot);
+            } else {
+                 throw Exception('Failed to retrieve the newly saved spot.');
+            }
+        } else {
+            throw Exception('Failed to save the spot to the database.');
+        }
+      }
+    } catch (e) {
+        if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error saving spot: ${e.toString()}'))
+            );
+        }
     }
   }
 

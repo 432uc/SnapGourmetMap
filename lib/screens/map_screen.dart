@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:exif/exif.dart';
+import 'package:image_picker/image_picker.dart' as image_picker;
+import 'package:exif/exif.dart' as exif;
 import '../helpers/db_helper.dart';
 import '../models/photo_spot.dart';
 import 'camera_screen.dart';
@@ -90,7 +90,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  double? _convertDmsToDecimal(List<Ratio>? dms, String? ref) {
+  double? _convertDmsToDecimal(List<exif.Ratio>? dms, String? ref) {
     if (dms == null || dms.length != 3 || ref == null) return null;
     try {
       double degrees = dms[0].toDouble();
@@ -105,11 +105,11 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _pickFromGallery() async {
     try {
-      final XFile? image = await ImagePicker().pickImage(source: ImageSource.gallery);
+      final image_picker.XFile? image = await image_picker.ImagePicker().pickImage(source: image_picker.ImageSource.gallery);
       if (image == null) return;
 
       final fileBytes = await image.readAsBytes();
-      final exifData = await readExifFromBytes(fileBytes);
+      final exifData = await exif.readExifFromBytes(fileBytes);
 
       final latTag = exifData['GPS GPSLatitude'];
       final lonTag = exifData['GPS GPSLongitude'];
@@ -121,8 +121,8 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
 
-      final double? latitude = _convertDmsToDecimal(latTag.values.toList().cast<Ratio>(), latRefTag.toString());
-      final double? longitude = _convertDmsToDecimal(lonTag.values.toList().cast<Ratio>(), lonRefTag.toString());
+      final double? latitude = _convertDmsToDecimal(latTag.values.toList().cast<exif.Ratio>(), latRefTag.toString());
+      final double? longitude = _convertDmsToDecimal(lonTag.values.toList().cast<exif.Ratio>(), lonRefTag.toString());
 
       if (latitude == null || longitude == null) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not parse location data.')));
