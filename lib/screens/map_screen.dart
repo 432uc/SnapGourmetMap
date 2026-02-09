@@ -58,66 +58,127 @@ class _MapScreenState extends State<MapScreen> {
   void _showImageDialog(PhotoSpot spot) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(spot.shopName ?? 'Spot #${spot.id}'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (spot.rating != null) Text('Rating: ' + '★' * spot.rating!),
-              const SizedBox(height: 8),
-              Image.file(File(spot.imagePath), errorBuilder: (c, o, s) => const Icon(Icons.error)),
-              const SizedBox(height: 8),
-              if(spot.notes != null && spot.notes!.isNotEmpty) Text(spot.notes!),
-            ],
-          ),
-        ),
-        actions: <Widget>[
-          TextButton(
-            child: const Text('Edit'),
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: spot)),
-              ).then((_) => _loadPhotoSpots());
-            },
-          ),
-          TextButton(
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Confirm Deletion'),
-                  content: Text('Are you sure you want to delete "${spot.shopName ?? 'this spot'}"?'),
-                  actions: <Widget>[
-                    TextButton(
-                      child: const Text('Cancel'),
-                      onPressed: () => Navigator.of(ctx).pop(false),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            final allImages = spot.allImages;
+            return AlertDialog(
+              title: Text(spot.shopName ?? 'Spot #${spot.id}'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (spot.rating != null) ...[
+                      Text('Rating: ' + '★' * spot.rating!),
+                      const SizedBox(height: 8),
+                    ],
+                    SizedBox(
+                      height: 300,
+                      width: double.maxFinite,
+                      child: allImages.isNotEmpty
+                          ? PageView.builder(
+                              itemCount: allImages.length,
+                              itemBuilder: (context, index) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                  child: Image.file(
+                                    File(allImages[index]),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, o, s) =>
+                                        const Center(child: Icon(Icons.error)),
+                                  ),
+                                );
+                              },
+                            )
+                          : const Center(child: Text("No images")),
                     ),
-                    TextButton(
-                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                    ),
+                    const SizedBox(height: 8),
+                    if (allImages.length < 5)
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.add_a_photo),
+                        label: const Text('Add Photo'),
+                        onPressed: () async {
+                          try {
+                            final image = await image_picker.ImagePicker()
+                                .pickImage(source: image_picker.ImageSource.camera);
+                            if (image == null) return;
+
+                            final updatedImages = List<String>.from(spot.additionalImages)..add(image.path);
+                            final updatedSpot = spot.copyWith(additionalImages: updatedImages);
+
+                            await DBHelper.update('photo_spots', updatedSpot.toMap(), updatedSpot.id!);
+                            
+                            // Refresh the spot object in the dialog
+                            setStateDialog(() {
+                              spot = updatedSpot;
+                            });
+                            
+                            // Refresh the map markers in the background
+                            _loadPhotoSpots();
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error adding photo: $e')),
+                            );
+                          }
+                        },
+                      ),
+                    const SizedBox(height: 8),
+                    if (spot.notes != null && spot.notes!.isNotEmpty)
+                      Text(spot.notes!),
                   ],
                 ),
-              );
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Edit'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => EditSpotScreen(photoSpot: spot)),
+                    ).then((_) => _loadPhotoSpots());
+                  },
+                ),
+                TextButton(
+                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Confirm Deletion'),
+                        content: Text(
+                            'Are you sure you want to delete "${spot.shopName ?? 'this spot'}"?'),
+                        actions: <Widget>[
+                          TextButton(
+                            child: const Text('Cancel'),
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                          ),
+                          TextButton(
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                          ),
+                        ],
+                      ),
+                    );
 
-              if (confirm == true) {
-                if(mounted) Navigator.of(context).pop(); // Close the main info dialog
-                await DBHelper.delete('photo_spots', spot.id!);
-                _loadPhotoSpots();
-              }
-            },
-          ),
-          TextButton(
-            child: const Text('Close'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
+                    if (confirm == true) {
+                      if (mounted) Navigator.of(context).pop(); // Close the main info dialog
+                      await DBHelper.delete('photo_spots', spot.id!);
+                      _loadPhotoSpots();
+                    }
+                  },
+                ),
+                TextButton(
+                  child: const Text('Close'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

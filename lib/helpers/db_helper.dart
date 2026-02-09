@@ -5,7 +5,7 @@ import '../models/order_item.dart';
 
 class DBHelper {
   static const String _databaseName = 'spots.db';
-  static const int _databaseVersion = 3;
+  static const int _databaseVersion = 4;
 
   static Future<sql.Database> database() async {
     final dbPath = await sql.getDatabasesPath();
@@ -19,7 +19,7 @@ class DBHelper {
 
   static Future _onCreate(sql.Database db, int version) async {
     await db.execute(
-        'CREATE TABLE photo_spots(id INTEGER PRIMARY KEY AUTOINCREMENT, latitude REAL, longitude REAL, imagePath TEXT, categoryId INTEGER, subCategoryId INTEGER, shopName TEXT, rating INTEGER, visitCount TEXT, notes TEXT, ordersJson TEXT)');
+        'CREATE TABLE photo_spots(id INTEGER PRIMARY KEY AUTOINCREMENT, latitude REAL, longitude REAL, imagePath TEXT, additionalImages TEXT, categoryId INTEGER, subCategoryId INTEGER, shopName TEXT, rating INTEGER, visitCount TEXT, notes TEXT, ordersJson TEXT)');
     await db.execute(
         'CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)');
     await db.execute(
@@ -41,6 +41,9 @@ class DBHelper {
       await db.execute('ALTER TABLE photo_spots ADD COLUMN visitCount TEXT');
       await db.execute('ALTER TABLE photo_spots ADD COLUMN notes TEXT');
       await db.execute('ALTER TABLE photo_spots ADD COLUMN ordersJson TEXT');
+    }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE photo_spots ADD COLUMN additionalImages TEXT');
     }
   }
 

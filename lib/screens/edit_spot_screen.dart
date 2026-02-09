@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../helpers/db_helper.dart';
 import '../models/category.dart';
 import '../models/sub_category.dart';
@@ -21,6 +22,9 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
   late TextEditingController _shopNameController;
   late TextEditingController _notesController;
   
+  // Image management
+  List<String> _currentImages = [];
+
   Category? _selectedCategory;
   SubCategory? _selectedSubCategory;
   int? _selectedRating;
@@ -39,16 +43,25 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     _selectedRating = widget.photoSpot.rating;
     _selectedVisitCount = widget.photoSpot.visitCount;
     _orders = List.from(widget.photoSpot.orders);
+    
+    // Initialize image list
+    _currentImages = widget.photoSpot.allImages;
+    
     _initializeScreen();
   }
 
   Future<void> _initializeScreen() async {
     await _loadCategories();
     if (widget.photoSpot.categoryId != null && _categories.any((c) => c.id == widget.photoSpot.categoryId)) {
-      _selectedCategory = _categories.firstWhere((cat) => cat.id == widget.photoSpot.categoryId);
-      await _loadSubCategories(widget.photoSpot.categoryId!);
-      if (widget.photoSpot.subCategoryId != null && _subCategories.any((s) => s.id == widget.photoSpot.subCategoryId)) {
-        _selectedSubCategory = _subCategories.firstWhere((sub) => sub.id == widget.photoSpot.subCategoryId);
+      try {
+        _selectedCategory = _categories.firstWhere((cat) => cat.id == widget.photoSpot.categoryId);
+        await _loadSubCategories(widget.photoSpot.categoryId!);
+        if (widget.photoSpot.subCategoryId != null && _subCategories.any((s) => s.id == widget.photoSpot.subCategoryId)) {
+          _selectedSubCategory = _subCategories.firstWhere((sub) => sub.id == widget.photoSpot.subCategoryId);
+        }
+      } catch (e) {
+        // Handle case where category might not exist anymore
+        print('Error loading categories: $e');
       }
     }
     setState(() => _isLoading = false);
@@ -62,6 +75,33 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
   Future<void> _loadSubCategories(int categoryId) async {
     final subCategoriesData = await DBHelper.getDataWhere('sub_categories', 'categoryId = ?', [categoryId]);
     _subCategories = subCategoriesData.map((item) => SubCategory.fromMap(item)).toList();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    if (_currentImages.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 5 images allowed.')));
+      return;
+    }
+    try {
+      final pickedFile = await ImagePicker().pickImage(source: source);
+      if (pickedFile != null) {
+        setState(() {
+          _currentImages.add(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    }
+  }
+
+  void _removeImage(int index) {
+    if (_currentImages.length <= 1) {
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('At least one image is required.')));
+       return;
+    }
+    setState(() {
+      _currentImages.removeAt(index);
+    });
   }
 
   void _onCategoryChanged(Category? newCategory) {
@@ -89,6 +129,10 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
 
   Future<void> _saveSpot() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (_currentImages.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one image.')));
+        return;
+    }
 
     try {
       if (widget.photoSpot.latitude == null || widget.photoSpot.longitude == null) {
@@ -99,7 +143,8 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
         id: widget.photoSpot.id,
         latitude: widget.photoSpot.latitude!,
         longitude: widget.photoSpot.longitude!,
-        imagePath: widget.photoSpot.imagePath,
+        imagePath: _currentImages[0], // Main image
+        additionalImages: _currentImages.length > 1 ? _currentImages.sublist(1) : [],
         categoryId: _selectedCategory?.id,
         subCategoryId: _selectedSubCategory?.id,
         shopName: _shopNameController.text,
@@ -151,7 +196,95 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Image.file(File(widget.photoSpot.imagePath)),
+                    SizedBox(
+                      height: 150,
+                      child: ReorderableListView(
+                        scrollDirection: Axis.horizontal,
+                        onReorder: (int oldIndex, int newIndex) {
+                          setState(() {
+                            if (oldIndex < newIndex) {
+                              newIndex -= 1;
+                            }
+                            final String item = _currentImages.removeAt(oldIndex);
+                            _currentImages.insert(newIndex, item);
+                          });
+                        },
+                        footer: _currentImages.length < 5
+                            ? GestureDetector(
+                                onTap: () {
+                                  showModalBottomSheet(
+                                      context: context,
+                                      builder: (ctx) => Wrap(
+                                            children: [
+                                              ListTile(
+                                                  leading: const Icon(Icons.camera_alt),
+                                                  title: const Text('Camera'),
+                                                  onTap: () {
+                                                    Navigator.pop(ctx);
+                                                    _pickImage(ImageSource.camera);
+                                                  }),
+                                              ListTile(
+                                                  leading: const Icon(Icons.photo_library),
+                                                  title: const Text('Gallery'),
+                                                  onTap: () {
+                                                    Navigator.pop(ctx);
+                                                    _pickImage(ImageSource.gallery);
+                                                  }),
+                                            ],
+                                          ));
+                                },
+                                child: Container(
+                                  width: 80,
+                                  color: Colors.grey[200],
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.add_a_photo, size: 30),
+                                ),
+                              )
+                            : null,
+                        children: [
+                          for (int index = 0; index < _currentImages.length; index++)
+                            Container(
+                              key: ValueKey(_currentImages[index]),
+                              width: 120,
+                              margin: const EdgeInsets.only(right: 8),
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.file(File(_currentImages[index]),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (c, o, s) => Container(
+                                          color: Colors.grey,
+                                          child: const Icon(Icons.broken_image))),
+                                  if (_currentImages.length > 1)
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: GestureDetector(
+                                        onTap: () => _removeImage(index),
+                                        child: Container(
+                                            color: Colors.black54,
+                                            child: const Icon(Icons.close,
+                                                color: Colors.white)),
+                                      ),
+                                    ),
+                                  Positioned(
+                                    left: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      color: Colors.black54,
+                                      padding: const EdgeInsets.all(2),
+                                      child: Text(
+                                          index == 0 ? 'Main' : '#${index + 1}',
+                                          style: const TextStyle(
+                                              color: Colors.white, fontSize: 12)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 20),
                     TextFormField(controller: _shopNameController, maxLength: 50, decoration: const InputDecoration(labelText: 'Shop Name')),
                     DropdownButtonFormField<int>(value: _selectedRating, hint: const Text('Rating'), items: [1, 2, 3, 4, 5].map((r) => DropdownMenuItem(value: r, child: Text('★' * r))).toList(), onChanged: (val) => setState(() => _selectedRating = val)),
