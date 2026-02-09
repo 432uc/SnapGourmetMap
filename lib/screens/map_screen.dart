@@ -80,6 +80,33 @@ class _MapScreenState extends State<MapScreen> {
                       Text('Rating: ' + '★' * spot.rating!),
                       const SizedBox(height: 8),
                     ],
+                    if (allImages.isNotEmpty) ...[
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FutureBuilder<DateTime>(
+                          key: ValueKey(allImages[currentIndex]), // Update when image changes
+                          future: File(allImages[currentIndex]).lastModified(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData) {
+                              final dt = snapshot.data!;
+                              final dateStr =
+                                  "${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4.0),
+                                child: Text(
+                                  dateStr,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox(height: 16); 
+                          },
+                        ),
+                      ),
+                    ],
                     SizedBox(
                       height: 300,
                       width: double.maxFinite,
@@ -89,13 +116,16 @@ class _MapScreenState extends State<MapScreen> {
                               controller: PageController(initialPage: currentIndex),
                               itemCount: allImages.length,
                               onPageChanged: (index) {
-                                currentIndex = index;
+                                setStateDialog(() {
+                                  currentIndex = index;
+                                });
                               },
                               itemBuilder: (context, index) {
+                                final file = File(allImages[index]);
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                                   child: Image.file(
-                                    File(allImages[index]),
+                                    file,
                                     fit: BoxFit.cover,
                                     errorBuilder: (c, o, s) =>
                                         const Center(child: Icon(Icons.error)),
