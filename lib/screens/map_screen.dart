@@ -59,9 +59,16 @@ class _MapScreenState extends State<MapScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        int currentIndex = 0;
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             final allImages = spot.allImages;
+            
+            // Adjust currentIndex if it's out of bounds (e.g., after deletion)
+            if (currentIndex >= allImages.length) {
+              currentIndex = allImages.length > 0 ? allImages.length - 1 : 0;
+            }
+
             return AlertDialog(
               title: Text(spot.shopName ?? 'Spot #${spot.id}'),
               content: SingleChildScrollView(
@@ -78,7 +85,11 @@ class _MapScreenState extends State<MapScreen> {
                       width: double.maxFinite,
                       child: allImages.isNotEmpty
                           ? PageView.builder(
+                              controller: PageController(initialPage: currentIndex),
                               itemCount: allImages.length,
+                              onPageChanged: (index) {
+                                currentIndex = index;
+                              },
                               itemBuilder: (context, index) {
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -112,6 +123,8 @@ class _MapScreenState extends State<MapScreen> {
                             // Refresh the spot object in the dialog
                             setStateDialog(() {
                               spot = updatedSpot;
+                              // Switch to the newly added image (last one)
+                              currentIndex = spot.allImages.length - 1;
                             });
                             
                             // Refresh the map markers in the background
@@ -142,31 +155,84 @@ class _MapScreenState extends State<MapScreen> {
                   },
                 ),
                 TextButton(
-                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  child: Text(
+                    allImages.length > 1 ? 'Delete Photo' : 'Delete Spot',
+                    style: const TextStyle(color: Colors.red),
+                  ),
                   onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Confirm Deletion'),
-                        content: Text(
-                            'Are you sure you want to delete "${spot.shopName ?? 'this spot'}"?'),
-                        actions: <Widget>[
-                          TextButton(
-                            child: const Text('Cancel'),
-                            onPressed: () => Navigator.of(ctx).pop(false),
-                          ),
-                          TextButton(
-                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                            onPressed: () => Navigator.of(ctx).pop(true),
-                          ),
-                        ],
-                      ),
-                    );
+                    if (allImages.length > 1) {
+                      // Delete only the current photo
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Delete Photo'),
+                          content: const Text('Delete this photo?'),
+                          actions: <Widget>[
+                            TextButton(
+                              child: const Text('Cancel'),
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                            ),
+                            TextButton(
+                              child: const Text('Delete',
+                                  style: TextStyle(color: Colors.red)),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                            ),
+                          ],
+                        ),
+                      );
 
-                    if (confirm == true) {
-                      if (mounted) Navigator.of(context).pop(); // Close the main info dialog
-                      await DBHelper.delete('photo_spots', spot.id!);
-                      _loadPhotoSpots();
+                      if (confirm == true) {
+                        try {
+                          final newImages = List<String>.from(allImages);
+                          newImages.removeAt(currentIndex);
+
+                          // The first image in the list becomes the main imagePath
+                          final newSpot = spot.copyWith(
+                            imagePath: newImages[0],
+                            additionalImages: newImages.sublist(1),
+                          );
+
+                          await DBHelper.update(
+                              'photo_spots', newSpot.toMap(), newSpot.id!);
+
+                          setStateDialog(() {
+                            spot = newSpot;
+                            // Index adjustment is handled at the start of builder
+                          });
+                          _loadPhotoSpots();
+                        } catch (e) {
+                           ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error deleting photo: $e')),
+                           );
+                        }
+                      }
+                    } else {
+                      // Delete the entire spot
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Confirm Deletion'),
+                          content: Text(
+                              'Are you sure you want to delete "${spot.shopName ?? 'this spot'}"?'),
+                          actions: <Widget>[
+                            TextButton(
+                              child: const Text('Cancel'),
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                            ),
+                            TextButton(
+                              child: const Text('Delete',
+                                  style: TextStyle(color: Colors.red)),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        if (mounted) Navigator.of(context).pop(); // Close the main info dialog
+                        await DBHelper.delete('photo_spots', spot.id!);
+                        _loadPhotoSpots();
+                      }
                     }
                   },
                 ),
