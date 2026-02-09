@@ -85,6 +85,7 @@ class _MapScreenState extends State<MapScreen> {
                       width: double.maxFinite,
                       child: allImages.isNotEmpty
                           ? PageView.builder(
+                              key: ValueKey(allImages.length), // Rebuild when count changes
                               controller: PageController(initialPage: currentIndex),
                               itemCount: allImages.length,
                               onPageChanged: (index) {
