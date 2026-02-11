@@ -18,6 +18,7 @@ dependencies:
   exif: ^3.3.0
   gal: ^2.3.2
   native_exif: ^0.7.0
+  quick_actions: ^1.1.0
 
 dev_dependencies:
   flutter_test:
