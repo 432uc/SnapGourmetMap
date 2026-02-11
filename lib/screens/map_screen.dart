@@ -142,11 +142,15 @@ class _MapScreenState extends State<MapScreen> {
                         label: const Text('Add Photo'),
                         onPressed: () async {
                           try {
-                            final image = await image_picker.ImagePicker()
-                                .pickImage(source: image_picker.ImageSource.camera);
-                            if (image == null) return;
+                            final String? imagePath = await Navigator.of(context).push<String>(
+                              MaterialPageRoute(
+                                builder: (context) => const CameraScreen(returnPathOnly: true),
+                              ),
+                            );
+                            
+                            if (imagePath == null) return;
 
-                            final updatedImages = List<String>.from(spot.additionalImages)..add(image.path);
+                            final updatedImages = List<String>.from(spot.additionalImages)..add(imagePath);
                             final updatedSpot = spot.copyWith(additionalImages: updatedImages);
 
                             await DBHelper.update('photo_spots', updatedSpot.toMap(), updatedSpot.id!);

@@ -7,6 +7,7 @@ import '../models/category.dart';
 import '../models/sub_category.dart';
 import '../models/photo_spot.dart';
 import '../models/order_item.dart';
+import 'camera_screen.dart';
 
 class EditSpotScreen extends StatefulWidget {
   final PhotoSpot photoSpot;
@@ -83,10 +84,21 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
       return;
     }
     try {
-      final pickedFile = await ImagePicker().pickImage(source: source);
-      if (pickedFile != null) {
+      String? imagePath;
+      if (source == ImageSource.camera) {
+        imagePath = await Navigator.of(context).push<String>(
+          MaterialPageRoute(
+            builder: (context) => const CameraScreen(returnPathOnly: true),
+          ),
+        );
+      } else {
+        final pickedFile = await ImagePicker().pickImage(source: source);
+        imagePath = pickedFile?.path;
+      }
+
+      if (imagePath != null) {
         setState(() {
-          _currentImages.add(pickedFile.path);
+          _currentImages.add(imagePath!);
         });
       }
     } catch (e) {

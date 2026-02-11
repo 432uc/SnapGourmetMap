@@ -1,12 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:gal/gal.dart';
+import 'package:native_exif/native_exif.dart';
 import '../models/photo_spot.dart';
 import 'edit_spot_screen.dart';
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({super.key});
+  final bool returnPathOnly;
+
+  const CameraScreen({super.key, this.returnPathOnly = false});
 
   @override
   State<CameraScreen> createState() => _CameraScreenState();
@@ -19,19 +24,18 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    // Do not initialize here anymore to prevent race conditions.
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Initialize the camera future only once.
     _initializeControllerFuture ??= _initializeCamera();
   }
 
   Future<void> _initializeCamera() async {
     await [Permission.camera, Permission.location].request();
     final cameras = await availableCameras();
+    if (cameras.isEmpty) return;
     final firstCamera = cameras.first;
     _controller = CameraController(firstCamera, ResolutionPreset.medium);
     return _controller!.initialize();
@@ -45,33 +49,60 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<void> _takePicture() async {
     try {
-      // Ensure that the camera is initialized.
       await _initializeControllerFuture;
 
       if (_controller == null || !_controller!.value.isInitialized) {
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: Camera is not available.')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Camera is not available.')),
+          );
+        }
         return;
       }
 
       final image = await _controller!.takePicture();
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
+
+      // EXIFにGPS情報を書き込む
+      final exif = await Exif.fromPath(image.path);
+      await exif.writeAttributes({
+        'GPSLatitude': position.latitude,
+        'GPSLatitudeRef': position.latitude >= 0 ? 'N' : 'S',
+        'GPSLongitude': position.longitude,
+        'GPSLongitudeRef': position.longitude >= 0 ? 'E' : 'W',
+      });
+      await exif.close();
+
+      // ギャラリーに保存
+      try {
+        await Gal.putImage(image.path);
+      } catch (e) {
+        debugPrint('ギャラリー保存エラー: $e');
+      }
 
       if (!mounted) return;
 
-      final tempSpot = PhotoSpot(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        imagePath: image.path,
-      );
+      if (widget.returnPathOnly) {
+        // パスのみを返却する（追加撮影用）
+        Navigator.of(context).pop(image.path);
+      } else {
+        // 新規スポット登録へ
+        final tempSpot = PhotoSpot(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          imagePath: image.path,
+        );
 
-      final finalSpot = await Navigator.of(context).push<PhotoSpot>(
-        MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: tempSpot)),
-      );
+        final finalSpot = await Navigator.of(context).push<PhotoSpot>(
+          MaterialPageRoute(
+              builder: (context) => EditSpotScreen(photoSpot: tempSpot)),
+        );
 
-      if (finalSpot != null && mounted) {
-        Navigator.of(context).pop(finalSpot);
+        if (finalSpot != null && mounted) {
+          Navigator.of(context).pop(finalSpot);
+        }
       }
-
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +120,9 @@ class _CameraScreenState extends State<CameraScreen> {
         future: _initializeControllerFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
+            if (_controller == null) {
+              return const Center(child: Text('No camera found'));
+            }
             return CameraPreview(_controller!);
           } else {
             return const Center(child: CircularProgressIndicator());
