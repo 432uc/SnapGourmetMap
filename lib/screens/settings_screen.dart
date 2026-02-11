@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../helpers/db_helper.dart';
 import '../models/category.dart';
 import 'sub_category_screen.dart';
+import 'export_screen.dart'; // Add this
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -70,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage Categories'),
+        title: const Text('Settings'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -84,42 +85,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No categories yet. Add one!'));
-          }
+          
+          final categories = snapshot.data ?? [];
 
-          final categories = snapshot.data!;
-          return ListView.builder(
-            itemCount: categories.length,
-            itemBuilder: (context, index) {
-              final category = categories[index];
-              return ListTile(
-                title: Text(category.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => _showCategoryDialog(category: category),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () async {
-                        await DBHelper.delete('categories', category.id!);
-                        _refreshCategories();
+                    ListTile(
+                      leading: const Icon(Icons.description_outlined, color: Colors.green),
+                      title: const Text('Google Sheets Export'),
+                      subtitle: const Text('データをスプレッドシートに出力'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ExportScreen()),
+                        );
                       },
+                    ),
+                    const Divider(),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'カテゴリー管理',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                onTap: () {
-                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => SubCategoryScreen(category: category),
-                    ),
-                  );
-                },
-              );
-            },
+              ),
+              if (categories.isEmpty)
+                const SliverFillRemaining(
+                  child: Center(child: Text('No categories yet. Add one!')),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final category = categories[index];
+                      return ListTile(
+                        title: Text(category.name),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showCategoryDialog(category: category),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              onPressed: () async {
+                                await DBHelper.delete('categories', category.id!);
+                                _refreshCategories();
+                              },
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => SubCategoryScreen(category: category),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    childCount: categories.length,
+                  ),
+                ),
+            ],
           );
         },
       ),

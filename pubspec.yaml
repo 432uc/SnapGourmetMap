@@ -19,6 +19,11 @@ dependencies:
   gal: ^2.3.2
   native_exif: ^0.7.0
   quick_actions: ^1.1.0
+  googleapis: ^11.4.0
+  google_sign_in: ^6.2.1
+  extension_google_sign_in_as_googleapis_auth: ^2.0.12
+  http: ^1.1.0
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:

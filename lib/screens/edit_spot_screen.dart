@@ -164,6 +164,7 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
         visitCount: _selectedVisitCount,
         notes: _notesController.text,
         orders: _orders,
+        visitDate: widget.photoSpot.visitDate,
       );
 
       if (spotToSave.id != null) {

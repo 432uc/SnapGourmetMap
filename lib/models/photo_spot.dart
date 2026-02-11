@@ -15,6 +15,7 @@ class PhotoSpot {
   final String? visitCount;
   final String? notes;
   final List<OrderItem> orders;
+  final DateTime visitDate; // Added for filtering and export
 
   PhotoSpot({
     this.id,
@@ -29,7 +30,8 @@ class PhotoSpot {
     this.visitCount,
     this.notes,
     this.orders = const [],
-  });
+    DateTime? visitDate,
+  }) : visitDate = visitDate ?? DateTime.now();
 
   // Getter for all images combined
   List<String> get allImages => [imagePath, ...additionalImages];
@@ -51,6 +53,7 @@ class PhotoSpot {
       'visitCount': visitCount,
       'notes': notes,
       'ordersJson': OrderItem.encode(orders),
+      'visitDate': visitDate.toIso8601String(), // Store as ISO string
     };
   }
 
@@ -79,7 +82,17 @@ class PhotoSpot {
       orders: map['ordersJson'] != null && map['ordersJson'].isNotEmpty 
           ? OrderItem.decode(map['ordersJson']) 
           : [],
+      visitDate: _parseDate(map['visitDate']),
     );
+  }
+
+  static DateTime _parseDate(dynamic date) {
+    if (date == null || date is! String || date.isEmpty) return DateTime.now();
+    try {
+      return DateTime.parse(date);
+    } catch (e) {
+      return DateTime.now();
+    }
   }
   
   // Create a copy with some fields replaced
@@ -96,6 +109,7 @@ class PhotoSpot {
     String? visitCount,
     String? notes,
     List<OrderItem>? orders,
+    DateTime? visitDate,
   }) {
     return PhotoSpot(
       id: id ?? this.id,
@@ -110,6 +124,7 @@ class PhotoSpot {
       visitCount: visitCount ?? this.visitCount,
       notes: notes ?? this.notes,
       orders: orders ?? this.orders,
+      visitDate: visitDate ?? this.visitDate,
     );
   }
 }

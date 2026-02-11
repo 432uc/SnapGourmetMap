@@ -5,7 +5,7 @@ import '../models/order_item.dart';
 
 class DBHelper {
   static const String _databaseName = 'spots.db';
-  static const int _databaseVersion = 4;
+  static const int _databaseVersion = 5;
 
   static Future<sql.Database> database() async {
     final dbPath = await sql.getDatabasesPath();
@@ -19,7 +19,7 @@ class DBHelper {
 
   static Future _onCreate(sql.Database db, int version) async {
     await db.execute(
-        'CREATE TABLE photo_spots(id INTEGER PRIMARY KEY AUTOINCREMENT, latitude REAL, longitude REAL, imagePath TEXT, additionalImages TEXT, categoryId INTEGER, subCategoryId INTEGER, shopName TEXT, rating INTEGER, visitCount TEXT, notes TEXT, ordersJson TEXT)');
+        'CREATE TABLE photo_spots(id INTEGER PRIMARY KEY AUTOINCREMENT, latitude REAL, longitude REAL, imagePath TEXT, additionalImages TEXT, categoryId INTEGER, subCategoryId INTEGER, shopName TEXT, rating INTEGER, visitCount TEXT, notes TEXT, ordersJson TEXT, visitDate TEXT)');
     await db.execute(
         'CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)');
     await db.execute(
@@ -44,6 +44,9 @@ class DBHelper {
     }
     if (oldVersion < 4) {
       await db.execute('ALTER TABLE photo_spots ADD COLUMN additionalImages TEXT');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE photo_spots ADD COLUMN visitDate TEXT');
     }
   }
 
@@ -77,6 +80,8 @@ class DBHelper {
     int? categoryId,
     int? rating,
     String? visitCount,
+    DateTime? startDate,
+    DateTime? endDate,
     int? minPrice,
     int? maxPrice,
     PriceSearchMode priceMode = PriceSearchMode.firstItem, // Default mode
@@ -100,6 +105,14 @@ class DBHelper {
     if (visitCount != null) {
       whereClauses.add('visitCount = ?');
       whereArgs.add(visitCount);
+    }
+    if (startDate != null) {
+      whereClauses.add('visitDate >= ?');
+      whereArgs.add(startDate.toIso8601String());
+    }
+    if (endDate != null) {
+      whereClauses.add('visitDate <= ?');
+      whereArgs.add(endDate.toIso8601String());
     }
 
     String? whereString = whereClauses.isNotEmpty ? whereClauses.join(' AND ') : null;
