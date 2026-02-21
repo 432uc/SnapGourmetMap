@@ -261,7 +261,7 @@ class _MapScreenState extends State<MapScreen> {
       final tempSpot = PhotoSpot(latitude: latitude, longitude: longitude, imagePath: image.path);
 
       if (!mounted) return;
-      final result = await Navigator.of(context).push<bool>(
+      final result = await Navigator.of(context).push(
         MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: tempSpot)),
       );
 
@@ -275,7 +275,7 @@ class _MapScreenState extends State<MapScreen> {
 
   void _navigateAndAddNewSpot() async {
     final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const CameraScreen()));
-    if (result != null) {
+    if (result != null && mounted) {
       await _loadPhotoSpots();
     }
   }

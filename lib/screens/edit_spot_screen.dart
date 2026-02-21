@@ -159,11 +159,14 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
   }
 
   Future<void> _saveSpot() async {
+    if (_isLoading) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_currentImages.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least one image.')));
         return;
     }
+
+    setState(() => _isLoading = true);
 
     try {
       if (widget.photoSpot.latitude == null || widget.photoSpot.longitude == null) {
@@ -188,22 +191,29 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
 
       if (spotToSave.id != null) {
         await DBHelper.update('photo_spots', spotToSave.toMap(), spotToSave.id!);
-        if (mounted) Navigator.of(context).pop();
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
       } else {
         final newId = await DBHelper.insert('photo_spots', spotToSave.toMap());
         if (newId > 0) {
             final results = await DBHelper.getDataWhere('photo_spots', 'id = ?', [newId]);
             if (results.isNotEmpty) {
                  final finalSpot = PhotoSpot.fromMap(results.first);
-                 if (mounted) Navigator.of(context).pop(finalSpot);
+                 if (mounted) {
+                   Navigator.of(context).pop(finalSpot);
+                 }
             } else {
+                 setState(() => _isLoading = false);
                  throw Exception('Failed to retrieve the newly saved spot.');
             }
         } else {
+            setState(() => _isLoading = false);
             throw Exception('Failed to save the spot to the database.');
         }
       }
     } catch (e) {
+        setState(() => _isLoading = false);
         if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Error saving spot: ${e.toString()}'))
@@ -217,7 +227,7 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.photoSpot.id == null ? 'Add Spot Details' : 'Edit Spot Details'),
-        actions: [IconButton(icon: const Icon(Icons.save), onPressed: _saveSpot)],
+        actions: [IconButton(icon: const Icon(Icons.save), onPressed: _isLoading ? null : _saveSpot)],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
