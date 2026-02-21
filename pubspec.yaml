@@ -24,6 +24,7 @@ dependencies:
   extension_google_sign_in_as_googleapis_auth: ^2.0.12
   http: ^1.1.0
   shared_preferences: ^2.5.4
+  image: ^4.8.0
 
 dev_dependencies:
   flutter_test:

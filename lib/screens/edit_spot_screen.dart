@@ -7,6 +7,7 @@ import '../models/category.dart';
 import '../models/sub_category.dart';
 import '../models/photo_spot.dart';
 import '../models/order_item.dart';
+import '../helpers/image_helper.dart';
 import 'camera_screen.dart';
 
 class EditSpotScreen extends StatefulWidget {
@@ -137,6 +138,24 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     setState(() {
       _orders.removeAt(index);
     });
+  }
+
+  Future<void> _rotateImage(int index) async {
+    final path = _currentImages[index];
+    setState(() => _isLoading = true);
+    try {
+      await ImageHelper.rotateImage(path);
+      // Evict from cache to refresh UI
+      await FileImage(File(path)).evict();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error rotating image: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _saveSpot() async {
@@ -280,6 +299,19 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
                                                 color: Colors.white)),
                                       ),
                                     ),
+                                  Positioned(
+                                    right: 0,
+                                    bottom: 0,
+                                    child: GestureDetector(
+                                      onTap: () => _rotateImage(index),
+                                      child: Container(
+                                        color: Colors.black54,
+                                        padding: const EdgeInsets.all(4),
+                                        child: const Icon(Icons.rotate_right,
+                                            color: Colors.white, size: 20),
+                                      ),
+                                    ),
+                                  ),
                                   Positioned(
                                     left: 0,
                                     bottom: 0,

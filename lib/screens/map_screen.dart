@@ -57,10 +57,13 @@ class _MapScreenState extends State<MapScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        int currentIndex = 0;
+        // Map index to rotation turns (0-3)
+        Map<int, int> rotations = {};
+
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             final allImages = spot.allImages;
-            int currentIndex = 0;
 
             return AlertDialog(
               title: Text(spot.shopName ?? 'Spot #${spot.id}'),
@@ -74,31 +77,41 @@ class _MapScreenState extends State<MapScreen> {
                       const SizedBox(height: 8),
                     ],
                     if (allImages.isNotEmpty) ...[
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: FutureBuilder<DateTime>(
-                          key: ValueKey(allImages[currentIndex]), 
-                          future: File(allImages[currentIndex]).lastModified(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData) {
-                              final dt = snapshot.data!;
-                              final dateStr =
-                                  "${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 4.0),
-                                child: Text(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          FutureBuilder<DateTime>(
+                            key: ValueKey(allImages[currentIndex]), 
+                            future: File(allImages[currentIndex]).lastModified(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData) {
+                                final dt = snapshot.data!;
+                                final dateStr =
+                                    "${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+                                return Text(
                                   dateStr,
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey,
                                   ),
-                                ),
-                              );
-                            }
-                            return const SizedBox(height: 16); 
-                          },
-                        ),
+                                );
+                              }
+                              return const SizedBox(height: 16); 
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.rotate_right, size: 20),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () {
+                              setStateDialog(() {
+                                rotations[currentIndex] = ((rotations[currentIndex] ?? 0) + 1) % 4;
+                              });
+                            },
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 4),
                     ],
                     SizedBox(
                       height: 300,
@@ -117,11 +130,14 @@ class _MapScreenState extends State<MapScreen> {
                                 final file = File(allImages[index]);
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                                  child: Image.file(
-                                    file,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (c, o, s) =>
-                                        const Center(child: Icon(Icons.error)),
+                                  child: RotatedBox(
+                                    quarterTurns: rotations[index] ?? 0,
+                                    child: Image.file(
+                                      file,
+                                      fit: BoxFit.contain, // Fit contain is better when rotating
+                                      errorBuilder: (c, o, s) =>
+                                          const Center(child: Icon(Icons.error)),
+                                    ),
                                   ),
                                 );
                               },
