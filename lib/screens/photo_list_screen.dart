@@ -178,7 +178,7 @@ class _PhotoListScreenState extends State<PhotoListScreen> {
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                       child: ListTile(
-                        leading: Image.file(File(spot.imagePath), width: 100, fit: BoxFit.cover, errorBuilder: (c, o, s) => const Icon(Icons.error, size: 40)),
+                        leading: Image.file(File(spot.imagePath ?? ''), width: 100, fit: BoxFit.cover, errorBuilder: (c, o, s) => const Icon(Icons.error, size: 40)),
                         title: Text(spot.shopName ?? 'Spot #${spot.id}'),
                         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [if (spot.rating != null) Text('★' * spot.rating!), FutureBuilder<String>(future: _getCategoryInfo(spot), builder: (context, catSnapshot) => Text(catSnapshot.data ?? 'Loading...'))]),
                         trailing: Row(

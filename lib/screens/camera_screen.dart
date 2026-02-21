@@ -94,14 +94,11 @@ class _CameraScreenState extends State<CameraScreen> {
           imagePath: image.path,
         );
 
-        final finalSpot = await Navigator.of(context).push<PhotoSpot>(
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
               builder: (context) => EditSpotScreen(photoSpot: tempSpot)),
         );
-
-        if (finalSpot != null && mounted) {
-          Navigator.of(context).pop(finalSpot);
-        }
       }
     } catch (e) {
       if (mounted) {

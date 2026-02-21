@@ -82,7 +82,7 @@ class GoogleSheetsService {
         
         return [
           spot.shopName ?? '',
-          spot.visitDate.toIso8601String().split('T')[0], // 訪問日
+          spot.visitDate?.toIso8601String().split('T')[0] ?? '', // 訪問日
           spot.visitCount ?? '', // 訪問回数
           categoryMap[spot.categoryId] ?? '', // カテゴリー名
           subCategoryMap[spot.subCategoryId] ?? '', // サブカテゴリー名

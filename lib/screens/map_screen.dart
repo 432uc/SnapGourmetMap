@@ -28,12 +28,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _loadPhotoSpots() async {
-    final dataList = await DBHelper.getData('photo_spots');
-    final spots = dataList.map((item) => PhotoSpot.fromMap(item)).toList();
+    final spots = await DBHelper.searchSpots();
     
     final Set<Marker> newMarkers = {};
     for (final spot in spots) {
-      // Add marker only if location data is valid.
       if (spot.latitude != null && spot.longitude != null) {
         newMarkers.add(
           Marker(
@@ -59,15 +57,10 @@ class _MapScreenState extends State<MapScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        int currentIndex = 0;
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             final allImages = spot.allImages;
-            
-            // Adjust currentIndex if it's out of bounds (e.g., after deletion)
-            if (currentIndex >= allImages.length) {
-              currentIndex = allImages.length > 0 ? allImages.length - 1 : 0;
-            }
+            int currentIndex = 0;
 
             return AlertDialog(
               title: Text(spot.shopName ?? 'Spot #${spot.id}'),
@@ -84,7 +77,7 @@ class _MapScreenState extends State<MapScreen> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: FutureBuilder<DateTime>(
-                          key: ValueKey(allImages[currentIndex]), // Update when image changes
+                          key: ValueKey(allImages[currentIndex]), 
                           future: File(allImages[currentIndex]).lastModified(),
                           builder: (context, snapshot) {
                             if (snapshot.hasData) {
@@ -112,7 +105,7 @@ class _MapScreenState extends State<MapScreen> {
                       width: double.maxFinite,
                       child: allImages.isNotEmpty
                           ? PageView.builder(
-                              key: ValueKey(allImages.length), // Rebuild when count changes
+                              key: ValueKey(allImages.length), 
                               controller: PageController(initialPage: currentIndex),
                               itemCount: allImages.length,
                               onPageChanged: (index) {
@@ -141,39 +134,20 @@ class _MapScreenState extends State<MapScreen> {
                         icon: const Icon(Icons.add_a_photo),
                         label: const Text('Add Photo'),
                         onPressed: () async {
-                          try {
-                            final String? imagePath = await Navigator.of(context).push<String>(
-                              MaterialPageRoute(
-                                builder: (context) => const CameraScreen(returnPathOnly: true),
-                              ),
-                            );
-                            
-                            if (imagePath == null) return;
-
-                            final updatedImages = List<String>.from(spot.additionalImages)..add(imagePath);
-                            final updatedSpot = spot.copyWith(additionalImages: updatedImages);
-
-                            await DBHelper.update('photo_spots', updatedSpot.toMap(), updatedSpot.id!);
-                            
-                            // Refresh the spot object in the dialog
-                            setStateDialog(() {
-                              spot = updatedSpot;
-                              // Switch to the newly added image (last one)
-                              currentIndex = spot.allImages.length - 1;
-                            });
-                            
-                            // Refresh the map markers in the background
-                            _loadPhotoSpots();
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error adding photo: $e')),
-                            );
-                          }
+                           final newImagePath = await Navigator.push<String>(context, MaterialPageRoute(builder: (context) => const CameraScreen(returnPathOnly: true)));
+                           if(newImagePath != null) {
+                              final updatedImages = List<String>.from(spot.additionalImages)..add(newImagePath);
+                              final updatedSpot = spot.copyWith(additionalImages: updatedImages);
+                              await DBHelper.update('photo_spots', updatedSpot.toMap(), updatedSpot.id!);
+                              setStateDialog(() {
+                                spot = updatedSpot;
+                              });
+                              _loadPhotoSpots();
+                           }
                         },
                       ),
                     const SizedBox(height: 8),
-                    if (spot.notes != null && spot.notes!.isNotEmpty)
-                      Text(spot.notes!),
+                    if (spot.notes != null && spot.notes!.isNotEmpty) Text(spot.notes!),
                   ],
                 ),
               ),
@@ -184,87 +158,38 @@ class _MapScreenState extends State<MapScreen> {
                     Navigator.of(context).pop();
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => EditSpotScreen(photoSpot: spot)),
+                      MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: spot)),
                     ).then((_) => _loadPhotoSpots());
                   },
                 ),
-                TextButton(
-                  child: Text(
-                    allImages.length > 1 ? 'Delete Photo' : 'Delete Spot',
-                    style: const TextStyle(color: Colors.red),
-                  ),
+                 TextButton(
+                  child: Text(allImages.length > 1 ? 'Delete Photo' : 'Delete Spot', style: const TextStyle(color: Colors.red)),
                   onPressed: () async {
                     if (allImages.length > 1) {
-                      // Delete only the current photo
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
+                      final confirm = await showDialog<bool>(context: context, builder: (ctx) => 
+                        AlertDialog(
                           title: const Text('Delete Photo'),
                           content: const Text('Delete this photo?'),
-                          actions: <Widget>[
-                            TextButton(
-                              child: const Text('Cancel'),
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                            ),
-                            TextButton(
-                              child: const Text('Delete',
-                                  style: TextStyle(color: Colors.red)),
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirm == true) {
-                        try {
-                          final newImages = List<String>.from(allImages);
-                          newImages.removeAt(currentIndex);
-
-                          // The first image in the list becomes the main imagePath
-                          final newSpot = spot.copyWith(
-                            imagePath: newImages[0],
-                            additionalImages: newImages.sublist(1),
-                          );
-
-                          await DBHelper.update(
-                              'photo_spots', newSpot.toMap(), newSpot.id!);
-
-                          setStateDialog(() {
-                            spot = newSpot;
-                            // Index adjustment is handled at the start of builder
-                          });
-                          _loadPhotoSpots();
-                        } catch (e) {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error deleting photo: $e')),
-                           );
-                        }
+                          actions: [ TextButton(child: const Text('Cancel'), onPressed: () => Navigator.of(ctx).pop(false)), TextButton(child: const Text('Delete'), onPressed: () => Navigator.of(ctx).pop(true))]
+                        ));
+                      if(confirm == true) {
+                        final newImages = List<String>.from(allImages)..removeAt(currentIndex);
+                        final newSpot = spot.copyWith(imagePath: newImages.isNotEmpty ? newImages[0] : null, additionalImages: newImages.length > 1 ? newImages.sublist(1) : []);
+                        await DBHelper.update('photo_spots', newSpot.toMap(), newSpot.id!);
+                        setStateDialog(() {
+                          spot = newSpot;
+                        });
+                        _loadPhotoSpots();
                       }
                     } else {
-                      // Delete the entire spot
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
+                       final confirm = await showDialog<bool>(context: context, builder: (ctx) => 
+                        AlertDialog(
                           title: const Text('Confirm Deletion'),
-                          content: Text(
-                              'Are you sure you want to delete "${spot.shopName ?? 'this spot'}"?'),
-                          actions: <Widget>[
-                            TextButton(
-                              child: const Text('Cancel'),
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                            ),
-                            TextButton(
-                              child: const Text('Delete',
-                                  style: TextStyle(color: Colors.red)),
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                            ),
-                          ],
-                        ),
-                      );
-
+                          content: Text('Delete "${spot.shopName ?? 'this spot'}"?'),
+                          actions: [ TextButton(child: const Text('Cancel'), onPressed: () => Navigator.of(ctx).pop(false)), TextButton(child: const Text('Delete'), onPressed: () => Navigator.of(ctx).pop(true))]
+                        ));
                       if (confirm == true) {
-                        if (mounted) Navigator.of(context).pop(); // Close the main info dialog
+                        if (mounted) Navigator.of(context).pop();
                         await DBHelper.delete('photo_spots', spot.id!);
                         _loadPhotoSpots();
                       }
@@ -317,19 +242,15 @@ class _MapScreenState extends State<MapScreen> {
         longitude = _convertDmsToDecimal(lonTag.values.toList().cast<exif.Ratio>(), lonRefTag.toString());
       }
       
-      // Create a spot, possibly without location.
       final tempSpot = PhotoSpot(latitude: latitude, longitude: longitude, imagePath: image.path);
 
       if (!mounted) return;
-      final newSpot = await Navigator.of(context).push<PhotoSpot>(
+      final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: tempSpot)),
       );
 
-      if (newSpot != null) {
+      if (result == true) {
         await _loadPhotoSpots();
-        if (newSpot.latitude != null && newSpot.longitude != null) {
-           mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
-        }
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error processing image: ${e.toString()}')));
@@ -337,12 +258,9 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _navigateAndAddNewSpot() async {
-    final newSpot = await Navigator.push<PhotoSpot>(context, MaterialPageRoute(builder: (context) => const CameraScreen()));
-    if (newSpot != null) {
+    final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const CameraScreen()));
+    if (result != null) {
       await _loadPhotoSpots();
-      if (newSpot.latitude != null && newSpot.longitude != null) {
-        mapController.animateCamera(CameraUpdate.newLatLng(newSpot.position));
-      }
     }
   }
 
