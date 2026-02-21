@@ -87,20 +87,27 @@ class _EditSpotScreenState extends State<EditSpotScreen> {
     try {
       String? imagePath;
       if (source == ImageSource.camera) {
-        imagePath = await Navigator.of(context).push<String>(
+        final path = await Navigator.of(context).push<String>(
           MaterialPageRoute(
             builder: (context) => const CameraScreen(returnPathOnly: true),
           ),
         );
+        if (path != null) {
+          setState(() {
+            _currentImages.add(path);
+          });
+        }
       } else {
-        final pickedFile = await ImagePicker().pickImage(source: source);
-        imagePath = pickedFile?.path;
-      }
-
-      if (imagePath != null) {
-        setState(() {
-          _currentImages.add(imagePath!);
-        });
+        final pickedFiles = await ImagePicker().pickMultiImage();
+        if (pickedFiles.isNotEmpty) {
+          setState(() {
+            for (var file in pickedFiles) {
+              if (_currentImages.length < 5) {
+                _currentImages.add(file.path);
+              }
+            }
+          });
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error picking image: $e')));

@@ -239,10 +239,11 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _pickFromGallery() async {
     try {
-      final image_picker.XFile? image = await image_picker.ImagePicker().pickImage(source: image_picker.ImageSource.gallery);
-      if (image == null) return;
+      final List<image_picker.XFile> images = await image_picker.ImagePicker().pickMultiImage();
+      if (images.isEmpty) return;
 
-      final fileBytes = await image.readAsBytes();
+      final firstImage = images.first;
+      final fileBytes = await firstImage.readAsBytes();
       final exifData = await exif.readExifFromBytes(fileBytes);
 
       final latTag = exifData['GPS GPSLatitude'];
@@ -258,7 +259,12 @@ class _MapScreenState extends State<MapScreen> {
         longitude = _convertDmsToDecimal(lonTag.values.toList().cast<exif.Ratio>(), lonRefTag.toString());
       }
       
-      final tempSpot = PhotoSpot(latitude: latitude, longitude: longitude, imagePath: image.path);
+      final tempSpot = PhotoSpot(
+        latitude: latitude, 
+        longitude: longitude, 
+        imagePath: firstImage.path,
+        additionalImages: images.length > 1 ? images.skip(1).take(4).map((e) => e.path).toList() : [],
+      );
 
       if (!mounted) return;
       final result = await Navigator.of(context).push(
