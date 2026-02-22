@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart' as image_picker;
-import 'package:exif/exif.dart' as exif;
+import 'package:native_exif/native_exif.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../helpers/db_helper.dart';
 import '../models/photo_spot.dart';
 import 'camera_screen.dart';
@@ -224,41 +226,48 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  double? _convertDmsToDecimal(List<exif.Ratio>? dms, String? ref) {
-    if (dms == null || dms.length != 3 || ref == null) return null;
-    try {
-      double degrees = dms[0].toDouble();
-      double minutes = dms[1].toDouble();
-      double seconds = dms[2].toDouble();
-      double decimal = degrees + (minutes / 60) + (seconds / 3600);
-      return (ref == 'S' || ref == 'W') ? -decimal : decimal;
-    } catch (e) {
-      return null;
-    }
-  }
+
 
   Future<void> _pickFromGallery() async {
     try {
+      // Android 10+ requires ACCESS_MEDIA_LOCATION to read GPS from EXIF
+      await [
+        Permission.accessMediaLocation,
+        Permission.location,
+      ].request();
+
       final List<image_picker.XFile> images = await image_picker.ImagePicker().pickMultiImage();
       if (images.isEmpty) return;
 
       final firstImage = images.first;
-      final fileBytes = await firstImage.readAsBytes();
-      final exifData = await exif.readExifFromBytes(fileBytes);
-
-      final latTag = exifData['GPS GPSLatitude'];
-      final lonTag = exifData['GPS GPSLongitude'];
-      final latRefTag = exifData['GPS GPSLatitudeRef'];
-      final lonRefTag = exifData['GPS GPSLongitudeRef'];
-
       double? latitude;
       double? longitude;
 
-      if (latTag != null && lonTag != null && latRefTag != null && lonRefTag != null) {
-        latitude = _convertDmsToDecimal(latTag.values.toList().cast<exif.Ratio>(), latRefTag.toString());
-        longitude = _convertDmsToDecimal(lonTag.values.toList().cast<exif.Ratio>(), lonRefTag.toString());
+      try {
+        final exif = await Exif.fromPath(firstImage.path);
+        final latLon = await exif.getLatLong();
+        await exif.close();
+        latitude = latLon?.latitude;
+        longitude = latLon?.longitude;
+      } catch (e) {
+        debugPrint('EXIF read error: $e');
       }
-      
+
+      if (latitude == null || longitude == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo has no GPS data. Using current location instead.')),
+          );
+        }
+        try {
+          final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+          latitude = position.latitude;
+          longitude = position.longitude;
+        } catch (e) {
+          debugPrint('Location fallback error: $e');
+        }
+      }
+
       final tempSpot = PhotoSpot(
         latitude: latitude, 
         longitude: longitude, 
@@ -271,7 +280,7 @@ class _MapScreenState extends State<MapScreen> {
         MaterialPageRoute(builder: (context) => EditSpotScreen(photoSpot: tempSpot)),
       );
 
-      if (result == true) {
+      if (result != null && mounted) {
         await _loadPhotoSpots();
       }
     } catch (e) {
